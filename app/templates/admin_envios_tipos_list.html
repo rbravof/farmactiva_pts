@@ -1,0 +1,62 @@
+{% extends "base_admin.html" %}
+{% block title %}Tipos de envío · Admin{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto p-6">
+  <h1 class="text-2xl font-semibold mb-4">Tipos de envío</h1>
+
+  <div class="mb-3 flex justify-end">
+    <a href="/admin/envios/tipos/nuevo" class="px-3 py-2 bg-green-600 text-white rounded-lg">Nuevo tipo</a>
+  </div>
+
+  <div class="bg-white border rounded-xl overflow-hidden">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-3 py-2 text-left">Nombre</th>
+          <th class="px-3 py-2 text-left">Código</th>
+          <th class="px-3 py-2 text-center">¿Requiere dirección?</th>
+          <th class="px-3 py-2 text-center">Activo</th>
+          <th class="px-3 py-2 w-40"></th>
+        </tr>
+      </thead>
+      <tbody id="rows">
+        <tr><td class="px-3 py-3 text-slate-500" colspan="5">Cargando…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% block scripts %}
+<script>
+(async function () {
+  const $rows = document.getElementById('rows');
+  try {
+    // 👇 OJO: ahora bajo /admin/api
+    const r = await fetch('/admin/api/envios/tipos', { headers: { 'Accept': 'application/json' } });
+    const data = await r.json();
+    if (!data.ok || !Array.isArray(data.items) || !data.items.length) {
+      $rows.innerHTML = '<tr><td class="px-3 py-3 text-slate-500" colspan="5">Sin tipos de envío.</td></tr>';
+      return;
+    }
+    $rows.innerHTML = data.items.map(it => `
+      <tr class="border-t">
+        <td class="px-3 py-2">${it.nombre}</td>
+        <td class="px-3 py-2">${it.codigo}</td>
+        <td class="px-3 py-2 text-center">${it.requiere_direccion ? 'Sí' : 'No'}</td>
+        <td class="px-3 py-2 text-center">${it.activo ? 'Activo' : 'Inactivo'}</td>
+        <td class="px-3 py-2 text-right">
+          <a class="text-blue-700 mr-3" href="/admin/envios/tipos/${it.id}/editar">Editar</a>
+          <form action="/admin/envios/tipos/${it.id}/toggle" method="post" style="display:inline">
+            <button class="text-amber-700" type="submit">${it.activo ? 'Desactivar' : 'Activar'}</button>
+          </form>
+        </td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    console.error(e);
+    $rows.innerHTML = '<tr><td class="px-3 py-3 text-red-600" colspan="5">No fue posible cargar la lista.</td></tr>';
+  }
+})();
+</script>
+{% endblock %}
+{% endblock %}

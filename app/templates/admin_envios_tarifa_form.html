@@ -1,0 +1,145 @@
+{% extends "base_admin.html" %}
+{% block title %}{{ 'Editar' if item else 'Nueva' }} tarifa · Envíos{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto p-6 space-y-4">
+  <a href="/admin/envios/tarifas" class="text-sm text-slate-600 hover:underline">Volver</a>
+  <h1 class="text-2xl font-semibold">{{ 'Editar' if item else 'Nueva' }} tarifa</h1>
+
+  {% set is_edit = item is not none %}
+  {% set action_url = '/admin/envios/tarifas/' ~ item.id_tarifa ~ '/editar' if is_edit else '/admin/envios/tarifas/nueva' %}
+
+  <form method="post" action="{{ action_url }}" class="bg-white border rounded-xl p-5 space-y-5" id="tarifa-form">
+    <!-- Tipo de envío -->
+    <div>
+      <label class="block text-sm mb-1">Tipo de envío</label>
+      <select name="id_tipo_envio" class="w-full border rounded-lg px-3 py-2">
+        <option value="">— Selecciona —</option>
+        {% for t in tipos %}
+          <option value="{{ t.id }}" {{ 'selected' if item and item.id_tipo_envio == t.id else '' }}>
+            {{ t.nombre }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Región / Comuna (combos dependientes) -->
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm mb-1">Región (opcional)</label>
+        <select name="id_region" id="sel-region" class="w-full border rounded-lg px-3 py-2">
+          <option value="">— Todas —</option>
+          {% for r in regiones %}
+            <option value="{{ r.id }}" {{ 'selected' if item and item.id_region == r.id else '' }}>
+              {{ r.nombre }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm mb-1">Comuna (opcional)</label>
+        <select name="id_comuna" id="sel-comuna" class="w-full border rounded-lg px-3 py-2">
+          <option value="">— Todas —</option>
+          {% for c in comunas %}
+            <option value="{{ c.id }}"
+                    data-rid="{{ c.id_region }}"
+                    {{ 'selected' if item and item.id_comuna == c.id else '' }}>
+              {{ c.nombre }}
+            </option>
+          {% endfor %}
+        </select>
+        <p class="text-xs text-slate-500 mt-1">Se filtra por región seleccionada.</p>
+      </div>
+    </div>
+
+    <!-- Precio base / gratis desde -->
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm mb-1">Precio base (CLP)</label>
+        <input name="base_clp" type="number" min="0" step="1"
+               class="w-full border rounded-lg px-3 py-2 text-right"
+               value="{{ item.base_clp if item and item.base_clp is not none else '' }}">
+      </div>
+      <div>
+        <label class="block text-sm mb-1">Gratis desde (CLP)</label>
+        <input name="gratis_desde" type="number" min="0" step="1"
+               class="w-full border rounded-lg px-3 py-2 text-right"
+               value="{{ item.gratis_desde if item and item.gratis_desde is not none else '' }}">
+      </div>
+    </div>
+
+    <!-- Pesos -->
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm mb-1">Peso mínimo (g)</label>
+        <input name="peso_min_g" type="number" min="0" step="1"
+               class="w-full border rounded-lg px-3 py-2 text-right"
+               value="{{ item.peso_min_g if item and item.peso_min_g is not none else '' }}">
+      </div>
+      <div>
+        <label class="block text-sm mb-1">Peso máximo (g)</label>
+        <input name="peso_max_g" type="number" min="0" step="1"
+               class="w-full border rounded-lg px-3 py-2 text-right"
+               value="{{ item.peso_max_g if item and item.peso_max_g is not none else '' }}">
+      </div>
+    </div>
+
+    <!-- Prioridad / Activa -->
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm mb-1">Prioridad</label>
+        <input name="prioridad" type="number" min="0" step="1"
+               class="w-full border rounded-lg px-3 py-2 text-right"
+               value="{{ item.prioridad if item and item.prioridad is not none else 100 }}">
+      </div>
+      <div class="flex items-end">
+        <label class="inline-flex items-center gap-2">
+          <input name="activo" type="checkbox" value="true" {{ 'checked' if (not item) or item.activo else '' }}>
+          <span>Activa</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-3">
+      <a href="/admin/envios/tarifas" class="px-3 py-2 border rounded-lg text-slate-700">Cancelar</a>
+      <button type="submit" class="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white">
+        Guardar
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+(() => {
+  console.log('[envios-tarifas] init');
+  const $region = document.getElementById('sel-region');
+  const $comuna = document.getElementById('sel-comuna');
+
+  function filterComunas() {
+    const rid = $region.value || '';
+    let any = false;
+    Array.from($comuna.options).forEach((opt, i) => {
+      if (!opt.value) { opt.hidden = false; return; } // “— Todas —”
+      const ok = !rid || opt.dataset.rid === rid;
+      opt.hidden = !ok;
+      if (ok) any = true;
+    });
+    // Si la comuna actual no pertenece a la región, limpia selección
+    const sel = $comuna.selectedOptions[0];
+    if (sel && sel.dataset && rid && sel.dataset.rid !== rid) {
+      $comuna.value = '';
+    }
+    console.log('[envios-tarifas] filter rid=', rid, 'anyVisible=', any);
+  }
+
+  // Si al cargar hay comuna seleccionada pero región vacía, setear región en base a data-rid de la comuna
+  const sel = $comuna.selectedOptions[0];
+  if ($region.value === '' && sel && sel.dataset && sel.dataset.rid) {
+    $region.value = sel.dataset.rid;
+  }
+
+  $region.addEventListener('change', filterComunas);
+  filterComunas();
+})();
+</script>
+{% endblock %}

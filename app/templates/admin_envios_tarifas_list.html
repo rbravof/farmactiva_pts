@@ -1,0 +1,79 @@
+{% extends "base_admin.html" %}
+{% block title %}Tarifas de envío · Admin{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto p-6">
+  <h1 class="text-2xl font-semibold mb-4">Tarifas de envío</h1>
+
+  <div class="mb-3 flex justify-end">
+    <a href="/admin/envios/tarifas/nueva" class="px-3 py-2 bg-green-600 text-white rounded-lg">Nueva tarifa</a>
+  </div>
+
+  <div class="bg-white border rounded-xl overflow-hidden">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-3 py-2 text-left">Tipo</th>
+          <th class="px-3 py-2 text-left">Región</th>
+          <th class="px-3 py-2 text-left">Comuna</th>
+          <th class="px-3 py-2 text-right">Base (CLP)</th>
+          <th class="px-3 py-2 text-right">Gratis desde</th>
+          <th class="px-3 py-2 text-right">Peso (g)</th>
+          <th class="px-3 py-2 text-center">Prioridad</th>
+          <th class="px-3 py-2 text-center">Activo</th>
+          <th class="px-3 py-2 w-36"></th>
+        </tr>
+      </thead>
+      <tbody id="rows">
+        <tr><td class="px-3 py-3 text-slate-500" colspan="9">Cargando…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% block scripts %}
+<script>
+(function(){
+  const fmt = new Intl.NumberFormat('es-CL');
+  const $rows = document.getElementById('rows');
+
+  async function load() {
+    try {
+      // 👇 OJO: ahora bajo /admin/api
+      const r = await fetch('/admin/api/envios/tarifas', { headers: { 'Accept': 'application/json' } });
+      const data = await r.json();
+      if (!data.ok || !Array.isArray(data.items) || !data.items.length) {
+        $rows.innerHTML = '<tr><td class="px-3 py-3 text-slate-500" colspan="9">Sin tarifas definidas.</td></tr>';
+        return;
+      }
+      $rows.innerHTML = data.items.map(it => `
+        <tr class="border-t">
+          <td class="px-3 py-2">${it.tipo_nombre}</td>
+          <td class="px-3 py-2">${it.region_nombre ?? '—'}</td>
+          <td class="px-3 py-2">${it.comuna_nombre ?? '—'}</td>
+          <td class="px-3 py-2 text-right">${fmt.format(it.base_clp)}</td>
+          <td class="px-3 py-2 text-right">${it.gratis_desde ? fmt.format(it.gratis_desde) : '—'}</td>
+          <td class="px-3 py-2 text-right">
+            ${it.peso_min_g ?? '—'} – ${it.peso_max_g ?? '—'}
+          </td>
+          <td class="px-3 py-2 text-center">${it.prioridad}</td>
+          <td class="px-3 py-2 text-center">${it.activo ? 'Activo' : 'Inactivo'}</td>
+          <td class="px-3 py-2 text-right">
+            <a class="text-blue-700 mr-3" href="/admin/envios/tarifas/${it.id_tarifa}/editar">Editar</a>
+            <form action="/admin/envios/tarifas/${it.id_tarifa}/eliminar" method="post" style="display:inline"
+                  onsubmit="return confirm('¿Eliminar esta tarifa?');">
+              <button class="text-red-700" type="submit">Eliminar</button>
+            </form>
+          </td>
+        </tr>
+      `).join('');
+    } catch(e) {
+      console.error(e);
+      $rows.innerHTML = '<tr><td class="px-3 py-3 text-red-600" colspan="9">No fue posible cargar la lista.</td></tr>';
+    }
+  }
+
+  load();
+})();
+</script>
+{% endblock %}
+{% endblock %}

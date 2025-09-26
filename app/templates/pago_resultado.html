@@ -1,0 +1,44 @@
+{% extends "base_admin.html" %}
+{% block title %}Resultado de pago {{ pedido.numero }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto p-6">
+  <a href="/admin/pedidos/{{ pedido.id_pedido }}" class="text-sm text-slate-600 hover:underline">← Volver al pedido</a>
+
+  <div class="mt-4 bg-white border rounded-xl p-6">
+    <h1 class="text-xl font-semibold mb-1">Pedido {{ pedido.numero }}</h1>
+    <p class="text-slate-500 text-sm">Total: {{ (pedido.total_neto or 0)|int }} {{ pedido.pago_moneda or 'CLP' }}</p>
+
+    {% if norm_status == 'approved' %}
+      <div class="mt-5 border border-emerald-200 bg-emerald-50 text-emerald-800 rounded-lg p-4">
+        <h2 class="font-medium">¡Pago aprobado!</h2>
+        <p class="text-sm mt-1">Tu pago fue procesado correctamente. Gracias por tu compra.</p>
+        {% if payment_id %}
+          <p class="text-xs mt-2 opacity-80">ID de pago: {{ payment_id }}</p>
+        {% endif %}
+      </div>
+    {% elif norm_status == 'rejected' %}
+      <div class="mt-5 border border-rose-200 bg-rose-50 text-rose-800 rounded-lg p-4">
+        <h2 class="font-medium">Pago rechazado</h2>
+        <p class="text-sm mt-1">El pago no pudo completarse. Te sugerimos intentarlo nuevamente.</p>
+      </div>
+    {% else %}
+      <div class="mt-5 border border-amber-200 bg-amber-50 text-amber-900 rounded-lg p-4">
+        <h2 class="font-medium">Pago en proceso</h2>
+        <p class="text-sm mt-1">Estamos esperando la confirmación. Este estado puede actualizarse en pocos minutos.</p>
+      </div>
+    {% endif %}
+
+    <div class="mt-6 flex gap-2">
+      <a href="/admin/pedidos/{{ pedido.id_pedido }}"
+         class="px-3 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">
+        Ver pedido
+      </a>
+      <a href="/admin/pedidos/{{ pedido.id_pedido }}#pago"
+         class="px-3 py-2 rounded-lg bg-slate-800 text-white hover:bg-slate-900">
+        Ir a sección de pago (admin)
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

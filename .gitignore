@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+*.egg-info/
+build/
+dist/
+
+# Entornos
+env/
+venv/
+.venv/
+.python-version
+
+# Logs y dumps
+*.log
+logs/
+dump.sql
+
+# IDE
+.vscode/
+.idea/
+
+# Credenciales
+.env
+.env.*
+!.env.example
+
+# Archivos temporales
+*.tmp
+*.swp
+.DS_Store
+Thumbs.db
+
+# Subidas locales (mantén un marcador)
+app/static/uploads/*
+!app/static/uploads/.gitkeep

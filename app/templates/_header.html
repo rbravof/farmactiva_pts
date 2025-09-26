@@ -1,0 +1,202 @@
+<header class="bg-white shadow-sm sticky top-0 z-50">
+  <!-- Fila 1: logo, búsqueda, cuenta, carrito -->
+  <div class="max-w-7xl mx-auto px-4">
+    <div class="flex items-center justify-between gap-3 py-3">
+      <!-- Burger móvil -->
+      <button id="btnMenu" class="md:hidden p-2 -ml-2 rounded hover:bg-gray-100" aria-label="Abrir menú">
+        <i class="fa-solid fa-bars text-xl"></i>
+      </button>
+
+      <a href="/" class="flex items-center gap-2">
+        <img src="/static/images/logo/logo.png" alt="FarmActiva" class="h-9 md:h-11">
+      </a>
+
+      <!-- Búsqueda desktop -->
+      <div class="hidden md:flex flex-1 max-w-3xl mx-4">
+        <form class="relative w-full" action="/resultados.html" method="GET">
+          <input name="q" id="q" type="search" placeholder="Busca un medicamento o producto…"
+                 class="w-full border border-gray-200 rounded-lg pl-11 pr-4 py-2 focus:ring-2
+                        focus:ring-green-600 focus:border-green-600 bg-gray-50 outline-none" />
+          <button type="submit" class="absolute left-3 top-2.5"><i class="fa-solid fa-magnifying-glass text-gray-400"></i></button>
+        </form>
+      </div>
+
+      <!-- Acciones -->
+      <nav class="flex items-center gap-4">
+        <a href="/login" id="loginLink" class="text-sm font-medium hover:text-green-700 hidden md:inline-flex">
+          <i class="fa-regular fa-user mr-2"></i> Iniciar sesión
+        </a>
+        <a href="/perfil" id="perfilLink" class="hidden text-sm font-medium hover:text-green-700">
+          <i class="fa-regular fa-user mr-2"></i> Mi cuenta
+        </a>
+        <a href="/carrito" class="relative text-sm font-medium hover:text-green-700">
+          <i class="fa-solid fa-cart-shopping mr-2"></i> Carrito
+          <span id="cartCount" class="absolute -top-2 -right-3 bg-green-600 text-white text-xs rounded-full px-1.5 leading-5">0</span>
+        </a>
+      </nav>
+    </div>
+
+    <!-- Búsqueda móvil -->
+    <div class="md:hidden pb-3">
+      <form class="relative" action="/resultados.html" method="GET">
+        <input name="q" id="qMobile" type="search" placeholder="Buscar productos…"
+               class="w-full border border-gray-200 rounded-lg pl-11 pr-4 py-2 focus:ring-2
+                      focus:ring-green-600 focus:border-green-600 bg-gray-50 outline-none" />
+        <button type="submit" class="absolute left-3 top-2.5"><i class="fa-solid fa-magnifying-glass text-gray-400"></i></button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Fila 2: menú categorías (desktop) -->
+  <div class="hidden md:block border-t border-gray-100">
+    <nav class="max-w-7xl mx-auto px-4">
+      <ul class="flex items-center gap-6 text-sm font-medium text-green-900 py-3" role="menubar">
+        <!-- Item con dropdown -->
+        <li class="relative group" role="none">
+          <button class="flex items-center gap-2 hover:text-green-700" role="menuitem" aria-haspopup="true" aria-expanded="false">
+            Medicamentos <i class="fa-solid fa-chevron-down text-xs"></i>
+          </button>
+          <div class="absolute left-0 top-full hidden group-hover:block group-focus-within:block bg-white border border-gray-100 rounded-lg shadow-lg mt-2 w-[34rem]">
+            <div class="p-4 grid grid-cols-2 gap-2">
+              <a href="/categoria/medicamentos/genericos" class="px-3 py-2 rounded hover:bg-gray-50">Genéricos</a>
+              <a href="/categoria/medicamentos/bioequivalentes" class="px-3 py-2 rounded hover:bg-gray-50">Bioequivalentes</a>
+              <a href="/categoria/medicamentos/venta-libre" class="px-3 py-2 rounded hover:bg-gray-50">Venta libre</a>
+              <a href="/categoria/medicamentos/receta" class="px-3 py-2 rounded hover:bg-gray-50">Con receta</a>
+            </div>
+          </div>
+        </li>
+
+        <li class="relative group" role="none">
+          <button class="flex items-center gap-2 hover:text-green-700" role="menuitem" aria-haspopup="true" aria-expanded="false">
+            Dermocosmética <i class="fa-solid fa-chevron-down text-xs"></i>
+          </button>
+          <div class="absolute left-0 top-full hidden group-hover:block group-focus-within:block bg-white border border-gray-100 rounded-lg shadow-lg mt-2 w-[30rem]">
+            <div class="p-4 grid grid-cols-2 gap-2">
+              <a href="/categoria/dermocosmetica/limpieza" class="px-3 py-2 rounded hover:bg-gray-50">Limpieza</a>
+              <a href="/categoria/dermocosmetica/hidratacion" class="px-3 py-2 rounded hover:bg-gray-50">Hidratación</a>
+              <a href="/categoria/dermocosmetica/antiage" class="px-3 py-2 rounded hover:bg-gray-50">Antiage</a>
+              <a href="/categoria/dermocosmetica/proteccion-solar" class="px-3 py-2 rounded hover:bg-gray-50">Protección solar</a>
+            </div>
+          </div>
+        </li>
+
+        <li class="relative group" role="none">
+          <button class="flex items-center gap-2 hover:text-green-700" role="menuitem" aria-haspopup="true" aria-expanded="false">
+            Perfumería <i class="fa-solid fa-chevron-down text-xs"></i>
+          </button>
+          <div class="absolute left-0 top-full hidden group-hover:block group-focus-within:block bg-white border border-gray-100 rounded-lg shadow-lg mt-2 w-[30rem]">
+            <div class="p-4 grid grid-cols-2 gap-2">
+              <a href="/categoria/perfumeria/damas" class="px-3 py-2 rounded hover:bg-gray-50">Damas</a>
+              <a href="/categoria/perfumeria/caballeros" class="px-3 py-2 rounded hover:bg-gray-50">Caballeros</a>
+              <a href="/categoria/perfumeria/unisex" class="px-3 py-2 rounded hover:bg-gray-50">Unisex</a>
+              <a href="/categoria/perfumeria/sets" class="px-3 py-2 rounded hover:bg-gray-50">Sets</a>
+            </div>
+          </div>
+        </li>
+
+        <li class="relative group" role="none">
+          <button class="flex items-center gap-2 hover:text-green-700" role="menuitem" aria-haspopup="true" aria-expanded="false">
+            Vitaminas <i class="fa-solid fa-chevron-down text-xs"></i>
+          </button>
+          <div class="absolute left-0 top-full hidden group-hover:block group-focus-within:block bg-white border border-gray-100 rounded-lg shadow-lg mt-2 w-[30rem]">
+            <div class="p-4 grid grid-cols-2 gap-2">
+              <a href="/categoria/vitaminas/multivitaminicos" class="px-3 py-2 rounded hover:bg-gray-50">Multivitamínicos</a>
+              <a href="/categoria/vitaminas/minerales" class="px-3 py-2 rounded hover:bg-gray-50">Minerales</a>
+              <a href="/categoria/vitaminas/omega" class="px-3 py-2 rounded hover:bg-gray-50">Omega</a>
+              <a href="/categoria/vitaminas/infantil" class="px-3 py-2 rounded hover:bg-gray-50">Infantil</a>
+            </div>
+          </div>
+        </li>
+
+        <li class="relative group" role="none">
+          <button class="flex items-center gap-2 hover:text-green-700" role="menuitem" aria-haspopup="true" aria-expanded="false">
+            Suplementos <i class="fa-solid fa-chevron-down text-xs"></i>
+          </button>
+          <div class="absolute left-0 top-full hidden group-hover:block group-focus-within:block bg-white border border-gray-100 rounded-lg shadow-lg mt-2 w-[30rem]">
+            <div class="p-4 grid grid-cols-2 gap-2">
+              <a href="/categoria/suplementos/deportivos" class="px-3 py-2 rounded hover:bg-gray-50">Deportivos</a>
+              <a href="/categoria/suplementos/mascotas" class="px-3 py-2 rounded hover:bg-gray-50">Mascotas</a>
+              <a href="/categoria/suplementos/herbales" class="px-3 py-2 rounded hover:bg-gray-50">Herbales</a>
+              <a href="/categoria/suplementos/otros" class="px-3 py-2 rounded hover:bg-gray-50">Otros</a>
+            </div>
+          </div>
+        </li>
+      </ul>
+    </nav>
+  </div>
+
+  <!-- Menú móvil (offcanvas) -->
+  <div id="mobileMenu" class="fixed inset-0 hidden">
+    <div class="absolute inset-0 bg-black/40" id="closeMenu" aria-hidden="true"></div>
+    <aside class="absolute left-0 top-0 h-full w-80 max-w-[85%] bg-white shadow-xl p-4 overflow-y-auto">
+      <div class="flex items-center justify-between mb-3">
+        <img src="/static/images/logo/logo.png" alt="FarmActiva" class="h-8">
+        <button id="btnCloseMenu" class="p-2 rounded hover:bg-gray-100" aria-label="Cerrar menú">
+          <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+      </div>
+      <nav class="space-y-2">
+        <!-- Cada grupo es acordeón -->
+        <div>
+          <button class="w-full flex items-center justify-between py-2 font-medium" data-acc>
+            Medicamentos <i class="fa-solid fa-chevron-down text-xs"></i>
+          </button>
+          <div class="pl-3 hidden space-y-1" data-acc-panel>
+            <a href="/categoria/medicamentos/genericos" class="block py-1.5">Genéricos</a>
+            <a href="/categoria/medicamentos/bioequivalentes" class="block py-1.5">Bioequivalentes</a>
+            <a href="/categoria/medicamentos/venta-libre" class="block py-1.5">Venta libre</a>
+            <a href="/categoria/medicamentos/receta" class="block py-1.5">Con receta</a>
+          </div>
+        </div>
+
+        <div>
+          <button class="w-full flex items-center justify-between py-2 font-medium" data-acc>
+            Dermocosmética <i class="fa-solid fa-chevron-down text-xs"></i>
+          </button>
+          <div class="pl-3 hidden space-y-1" data-acc-panel>
+            <a href="/categoria/dermocosmetica/limpieza" class="block py-1.5">Limpieza</a>
+            <a href="/categoria/dermocosmetica/hidratacion" class="block py-1.5">Hidratación</a>
+            <a href="/categoria/dermocosmetica/antiage" class="block py-1.5">Antiage</a>
+            <a href="/categoria/dermocosmetica/proteccion-solar" class="block py-1.5">Protección solar</a>
+          </div>
+        </div>
+
+        <div>
+          <button class="w-full flex items-center justify-between py-2 font-medium" data-acc>
+            Perfumería <i class="fa-solid fa-chevron-down text-xs"></i>
+          </button>
+          <div class="pl-3 hidden space-y-1" data-acc-panel>
+            <a href="/categoria/perfumeria/damas" class="block py-1.5">Damas</a>
+            <a href="/categoria/perfumeria/caballeros" class="block py-1.5">Caballeros</a>
+            <a href="/categoria/perfumeria/unisex" class="block py-1.5">Unisex</a>
+            <a href="/categoria/perfumeria/sets" class="block py-1.5">Sets</a>
+          </div>
+        </div>
+
+        <div>
+          <button class="w-full flex items-center justify-between py-2 font-medium" data-acc>
+            Vitaminas <i class="fa-solid fa-chevron-down text-xs"></i>
+          </button>
+          <div class="pl-3 hidden space-y-1" data-acc-panel>
+            <a href="/categoria/vitaminas/multivitaminicos" class="block py-1.5">Multivitamínicos</a>
+            <a href="/categoria/vitaminas/minerales" class="block py-1.5">Minerales</a>
+            <a href="/categoria/vitaminas/omega" class="block py-1.5">Omega</a>
+            <a href="/categoria/vitaminas/infantil" class="block py-1.5">Infantil</a>
+          </div>
+        </div>
+
+        <div>
+          <button class="w-full flex items-center justify-between py-2 font-medium" data-acc>
+            Suplementos <i class="fa-solid fa-chevron-down text-xs"></i>
+          </button>
+          <div class="pl-3 hidden space-y-1" data-acc-panel>
+            <a href="/categoria/suplementos/deportivos" class="block py-1.5">Deportivos</a>
+            <a href="/categoria/suplementos/mascotas" class="block py-1.5">Mascotas</a>
+            <a href="/categoria/suplementos/herbales" class="block py-1.5">Herbales</a>
+            <a href="/categoria/suplementos/otros" class="block py-1.5">Otros</a>
+          </div>
+        </div>
+      </nav>
+    </aside>
+  </div>
+</header>

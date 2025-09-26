@@ -1,0 +1,723 @@
+{% extends "base_admin.html" %}
+{% block title %}{{ 'Editar' if item else 'Nuevo' }} producto{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto p-6">
+  <a href="/admin/productos" class="text-sm text-slate-600 hover:underline">Volver</a>
+  <h1 class="text-2xl font-semibold mt-2">{{ 'Editar' if item else 'Nuevo' }} producto</h1>
+
+  <form method="post"
+        action="{{ '/admin/productos/' ~ item.id_producto ~ '/editar' if item else '/admin/productos/nuevo' }}"
+        enctype="multipart/form-data"
+        class="mt-6">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Columna principal (2/3) -->
+      <div class="lg:col-span-2 space-y-6">
+
+        <!-- Tarjeta: Nombre + Imágenes + Descripción -->
+        <div class="bg-white border rounded-xl p-5 space-y-5">
+          <!-- Nombre -->
+          <div>
+            <label class="block text-sm text-slate-700 mb-1">Nombre</label>
+            <input name="nombre" type="text" required
+                   class="w-full border rounded-lg px-3 py-2"
+                   value="{{ item.nombre if item else '' }}">
+          </div>
+
+          <!-- Imágenes -->
+          <div>
+            <label class="block text-sm text-slate-700 mb-2">Imágenes del producto</label>
+            <div class="border border-dashed rounded-lg p-4 text-center">
+              <input id="imagenes" name="imagenes" type="file" accept="image/*" multiple
+                     class="block w-full text-sm file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-slate-100 file:text-slate-700">
+              <p class="text-xs text-slate-500 mt-2">Puedes seleccionar varias imágenes. La primera será la principal.</p>
+              <div id="preview" class="mt-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {% if item and item.imagen_principal_url %}
+                  <div class="border rounded overflow-hidden aspect-square bg-white">
+                    <img src="{{ item.imagen_principal_url }}" class="w-full h-full object-cover" alt="principal">
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <!-- Descripción con editor -->
+          <div>
+            <label class="block text-sm text-slate-700 mb-2">Descripción web</label>
+
+            <div class="flex flex-wrap items-center gap-2 mb-2">
+              <button type="button" data-cmd="bold" class="px-2 py-1 text-sm border rounded hover:bg-slate-50">Negrita</button>
+              <button type="button" data-cmd="italic" class="px-2 py-1 text-sm border rounded hover:bg-slate-50">Cursiva</button>
+              <button type="button" data-cmd="underline" class="px-2 py-1 text-sm border rounded hover:bg-slate-50">Subrayado</button>
+              <span class="mx-1 text-slate-300">|</span>
+              <button type="button" data-cmd="insertUnorderedList" class="px-2 py-1 text-sm border rounded hover:bg-slate-50">• Lista</button>
+              <button type="button" data-cmd="insertOrderedList" class="px-2 py-1 text-sm border rounded hover:bg-slate-50">1. Lista</button>
+              <button type="button" id="btnLink" class="px-2 py-1 text-sm border rounded hover:bg-slate-50">Enlace</button>
+              <button type="button" data-cmd="removeFormat" class="px-2 py-1 text-sm border rounded hover:bg-slate-50">Limpiar</button>
+            </div>
+
+            <!-- CSS mínimo para márgenes/estilos en el editor -->
+            <style>
+              #editor p { margin: 0 0 0.75rem; }
+              #editor p:last-child { margin-bottom: 0; }
+              #editor ul, #editor ol { padding-left: 1.25rem; margin: 0.5rem 0 0.75rem; }
+              #editor strong, #editor b { font-weight: 600; }
+            </style>
+
+            <div id="editor"
+                 class="min-h-[200px] border rounded-lg p-3 prose prose-sm max-w-none focus:outline-none"
+                 contenteditable="true">{{ item.descripcion_web|safe if item else '' }}</div>
+
+            <textarea name="descripcion_web" id="descripcion_web" class="hidden">{{ item.descripcion_web if item else '' }}</textarea>
+            <p class="text-xs text-slate-500 mt-2">Puedes dar formato (negrita, listas, enlaces). Se guarda como HTML.</p>
+          </div>
+        </div>
+
+        <!-- NUEVA Tarjeta: Inventario -->
+        <div class="bg-white border rounded-xl p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-sm text-slate-700 mb-1">Código interno</label>
+            <input name="codigo_interno" type="text" class="w-full border rounded-lg px-3 py-2"
+                   value="{{ item.codigo_interno if item and item.codigo_interno is not none else '' }}">
+          </div>
+          <div>
+            <label class="block text-sm text-slate-700 mb-1">Código de barra (EAN)</label>
+            <input name="codigo_barra" type="text" class="w-full border rounded-lg px-3 py-2"
+                   value="{{ item.codigo_barra if item and item.codigo_barra is not none else '' }}">
+          </div>
+          <div class="flex items-end">
+            <label class="inline-flex items-center gap-2">
+              <input type="checkbox" name="seguir_vendiendo" value="true"
+                     {% if item and item.seguir_vendiendo %}checked{% endif %}>
+              <span class="text-sm">Seguir vendiendo con stock 0</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Tarjeta: Precio/Stock + Medidas -->
+        <div class="bg-white border rounded-xl p-5 grid grid-cols-2 md:grid-cols-6 gap-4">
+          <!-- Tipo de medicamento -->
+          <div class="md:col-span-2">
+            <label class="block text-sm text-slate-700 mb-1">Tipo de medicamento</label>
+            <select name="id_tipo_medicamento" class="w-full border rounded-lg px-3 py-2">
+              {% if tipos_medicamento %}
+                {% for t in tipos_medicamento %}
+                  <option value="{{ t.id_tipo_medicamento }}"
+                    {% if item and item.id_tipo_medicamento == t.id_tipo_medicamento %}selected{% endif %}>
+                    {{ t.nombre }}
+                  </option>
+                {% endfor %}
+              {% else %}
+                <option value="">— Sin catálogo —</option>
+              {% endif %}
+            </select>
+            <p class="text-xs text-slate-500 mt-1">Marca, Bioequivalente o Genérico.</p>
+          </div>
+
+          <!-- Costo neto (compra) -->
+          <div class="md:col-span-2">
+            <label class="block text-sm text-slate-700 mb-1">Costo neto (compra)</label>
+            <input name="costo_neto" type="number" step="1" min="0"
+                  class="w-full border rounded-lg px-3 py-2"
+                  value="{{ item.costo_neto if item and item.costo_neto is not none else '' }}">
+            <p class="text-xs text-slate-500 mt-1">
+              Precio de compra unitario sin IVA (CLP entero).
+              {% if lista_activa == 'pts' %}En PTS el precio de venta se calcula automáticamente por margen.{% endif %}
+            </p>
+          </div>
+
+          {# PVP manual solo visible si la lista activa es PVP #}
+          {% if lista_activa == 'pvp' %}
+          <div class="md:col-span-2">
+            <label class="block text-sm text-slate-700 mb-1">PVP (manual) — Precio al público</label>
+            <input name="pvp_bruto_manual" type="number" step="1" min="0"
+                  class="w-full border rounded-lg px-3 py-2"
+                  value="{{ item.pvp_vigente if item and item.pvp_vigente is not none else '' }}">
+            <p class="text-xs text-slate-500 mt-1">
+              Si ingresas un valor, se publica como precio al público (lista PVP).
+            </p>
+          </div>
+          {% else %}
+            <input type="hidden" name="pvp_bruto_manual" value="">
+          {% endif %}
+
+          <div class="md:col-span-2">
+            <label class="block text-sm text-slate-700 mb-1">Stock</label>
+            <input name="stock" type="number" class="w-full border rounded-lg px-3 py-2"
+                  value="{{ item.stock if item else '' }}">
+          </div>
+          <div>
+            <label class="block text-sm text-slate-700 mb-1">Peso (g)</label>
+            <input name="peso_gramos" type="number" class="w-full border rounded-lg px-3 py-2"
+                  value="{{ item.peso_gramos if item else '' }}">
+          </div>
+          <div>
+            <label class="block text-sm text-slate-700 mb-1">Alto (mm)</label>
+            <input name="alto_mm" type="number" class="w-full border rounded-lg px-3 py-2"
+                  value="{{ item.alto_mm if item else '' }}">
+          </div>
+          <div>
+            <label class="block text-sm text-slate-700 mb-1">Ancho (mm)</label>
+            <input name="ancho_mm" type="number" class="w-full border rounded-lg px-3 py-2"
+                  value="{{ item.ancho_mm if item else '' }}">
+          </div>
+          <div>
+            <label class="block text-sm text-slate-700 mb-1">Largo (mm)</label>
+            <input name="largo_mm" type="number" class="w-full border rounded-lg px-3 py-2"
+                  value="{{ item.largo_mm if item else '' }}">
+          </div>
+        </div>
+
+        <!-- Tarjeta SEO (primera línea: SEO; segunda: Slug) -->
+        <div class="bg-white border rounded-xl p-5 space-y-4">
+          <!-- Línea 1: SEO Título + SEO Descripción -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label for="seo_titulo" class="block text-sm text-slate-700 mb-1">SEO Título</label>
+              <input id="seo_titulo" name="seo_titulo" type="text"
+                    class="w-full border rounded-lg px-3 py-2"
+                    value="{{ item.seo_titulo if item else '' }}"
+                    placeholder="Título que aparecerá en Google (50–60 caracteres)">
+              <p class="text-xs text-slate-500 mt-1">
+                Recomendado: 50–60 caracteres.
+              </p>
+            </div>
+            <div>
+              <label for="seo_descripcion" class="block text-sm text-slate-700 mb-1">SEO Descripción</label>
+              <input id="seo_descripcion" name="seo_descripcion" type="text"
+                    class="w-full border rounded-lg px-3 py-2"
+                    value="{{ item.seo_descripcion if item else '' }}"
+                    placeholder="Resumen para motores de búsqueda (máx. ~160 caracteres)">
+              <p class="text-xs text-slate-500 mt-1">
+                Recomendado: 140–160 caracteres.
+              </p>
+            </div>
+          </div>
+
+          <!-- Línea 2: Slug -->
+          <div>
+            <label for="slug" class="block text-sm text-slate-700 mb-1">Slug</label>
+            <input id="slug" name="slug" type="text" class="w-full border rounded-lg px-3 py-2"
+                  value="{{ item.slug if item else '' }}" placeholder="mi-producto-500mg">
+            <p class="text-xs text-slate-500 mt-1">Si lo dejas vacío, se genera desde el nombre.</p>
+          </div>
+        </div>
+
+        <!-- Acciones al final -->
+        <div class="bg-white border rounded-xl p-5 flex items-center justify-end gap-3">
+          <a href="/admin/productos" class="px-3 py-2 border rounded-lg">Cancelar</a>
+          <button type="submit"
+                  class="px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white border border-green-600">
+            Guardar
+          </button>
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <aside class="lg:col-span-1 space-y-6">
+        <!-- Estado -->
+        <div class="bg-white border rounded-xl p-5 sticky top-4">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-sm text-slate-600">Estado</span>
+            {% set activo = (item.visible_web if item else False) %}
+            <span class="text-xs rounded-full px-2 py-1 {{ 'bg-green-100 text-green-700' if activo else 'bg-slate-100 text-slate-700' }}">
+              {{ 'Activo' if activo else 'Inactivo' }}
+            </span>
+          </div>
+          <label class="block text-sm text-slate-700 mb-1">Publicación</label>
+          <select name="visible_web" class="w-full border rounded-lg px-3 py-2 mb-4">
+            <option value="true"  {{ 'selected' if activo else '' }}>Activo</option>
+            <option value="false" {{ '' if activo else 'selected' }}>Inactivo</option>
+          </select>
+          <div class="flex items-center gap-3">
+            <a href="/admin/productos" class="px-3 py-2 border rounded-lg">Cancelar</a>
+            <button type="submit"
+                    class="px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white border border-green-600">
+              Guardar
+            </button>
+          </div>
+        </div>
+
+        <!-- Organización del producto -->
+        <div class="bg-white border rounded-xl p-5">
+          <h3 class="font-medium mb-3">Organización del producto</h3>
+          <div class="space-y-3 text-sm text-slate-700">
+
+            <!-- Marca -->
+            <div>
+              <label class="block mb-1">Marca</label>
+              <input id="marca_input" type="text"
+                    class="w-full border rounded-lg px-3 py-2"
+                    placeholder="Ej: Vichy, Nivea, Megalabs"
+                    value="{{ item.marca_nombre if item and item.marca_nombre else '' }}">
+              <input id="marca_id" name="marca_id_raw" type="hidden" value="{{ item.id_marca if item and item.id_marca else '' }}">
+              <input id="marca_nombre" name="marca_nombre" type="hidden" value="{{ item.marca_nombre if item and item.marca_nombre else '' }}">
+              <div id="marca_suggest"
+                  class="mt-1 hidden border rounded-lg bg-white shadow-lg max-h-56 overflow-auto z-10"></div>
+              <p class="text-xs text-slate-500 mt-1">Escribe al menos 3 letras. Si no existe, se creará automáticamente al guardar.</p>
+            </div>
+
+            <!-- Organización del producto (Categoría/Subcategoría) -->
+            <div class="space-y-4">
+
+              <!-- Categoría -->
+              <div class="space-y-1.5">
+                <label for="categoria_id" class="flex items-center gap-2 text-sm font-medium text-slate-700">
+                  <i class="fa fa-layer-group text-slate-500"></i>
+                  <span>Categoría</span>
+                </label>
+                <select id="categoria_id" name="categoria_id_raw"
+                        class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm
+                              focus:outline-none focus:ring-2 focus:ring-[#01485E]">
+                  <option value="">— Selecciona —</option>
+                  {% if categorias %}
+                    {% for c in categorias %}
+                      <option value="{{ c.id }}" {{ 'selected' if item and item.categoria_id == c.id else '' }}>
+                        {{ c.nombre }}
+                      </option>
+                    {% endfor %}
+                  {% endif %}
+                </select>
+              </div>
+
+              <!-- Subcategoría -->
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <label for="subcategoria_id" class="flex items-center gap-2 text-sm font-medium text-slate-700">
+                    <i class="fa fa-tags text-slate-500"></i>
+                    <span>Subcategoría</span>
+                  </label>
+                  <button type="button" id="btnNuevaSubcat"
+                          class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5
+                                text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                          disabled>
+                    <i class="fa fa-plus"></i> Nueva
+                  </button>
+                </div>
+
+                <select id="subcategoria_id" name="subcategoria_id_raw"
+                        class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm
+                              focus:outline-none focus:ring-2 focus:ring-[#01485E]"
+                        disabled>
+                  <option value="">Seleccione subcategoría…</option>
+                </select>
+
+                <p id="subcatHelper" class="text-xs text-slate-500">
+                  Seleccione primero una categoría.
+                </p>
+              </div>
+
+            </div>
+
+            <!-- Etiquetas (placeholder) -->
+            <div>
+              <label class="block mb-1">Etiquetas</label>
+              <input type="text" class="w-full border rounded-lg px-3 py-2" placeholder="separadas por coma" disabled>
+            </div>
+
+            <!-- Tipo de receta -->
+            {% set tipo_sel = tipo_receta if tipo_receta is defined else ('Receta Médica Simple' if item and item.requiere_receta else 'Venta Libre') %}
+            <div>
+              <label class="block mb-1">Tipo de receta</label>
+              <select name="tipo_receta" class="w-full border rounded-lg px-3 py-2">
+                <option value="Venta Libre" {{ 'selected' if tipo_sel == 'Venta Libre' else '' }}>Venta Libre</option>
+                <option value="Receta Médica Simple" {{ 'selected' if tipo_sel == 'Receta Médica Simple' else '' }}>Receta Médica Simple</option>
+                <option value="Receta Médica Retenida" {{ 'selected' if tipo_sel == 'Receta Médica Retenida' else '' }}>Receta Médica Retenida</option>
+                <option value="Receta Médica Cheque" {{ 'selected' if tipo_sel == 'Receta Médica Cheque' else '' }}>Receta Médica Cheque</option>
+              </select>
+              <p class="text-xs text-slate-500 mt-1">
+                Si eliges cualquier opción distinta a “Venta Libre”, el producto se marcará como <em>requiere receta</em>.
+              </p>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+    <div class="lg:hidden fixed bottom-0 left-0 right-0 border-t bg-white/95 backdrop-blur p-3 flex justify-end gap-3">
+      <a href="/admin/productos" class="px-3 py-2 border rounded-lg">Cancelar</a>
+      <button type="submit"
+              class="px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white border border-green-600">
+        Guardar
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const selCat = document.getElementById('categoria_id');
+    const selSub = document.getElementById('subcategoria_id');
+    const btnNew = document.getElementById('btnNuevaSubcat');
+    const helper = document.getElementById('subcatHelper');
+
+    async function cargarSubcategorias(idCategoria) {
+      const selSub = document.getElementById('subcategoria_id');
+      const btnNew = document.getElementById('btnNuevaSubcat');
+      const helper = document.getElementById('subcatHelper');
+
+      selSub.innerHTML = '<option value="">Cargando…</option>';
+      selSub.disabled = true;
+      btnNew.disabled = true;
+      helper.textContent = 'Cargando subcategorías…';
+
+      try {
+        const resp = await fetch(`/admin/subcategorias?id_categoria=${encodeURIComponent(idCategoria)}`, {
+          headers: {'Accept': 'application/json'}
+        });
+        const data = await resp.json();
+
+        selSub.innerHTML = '<option value="">Seleccione subcategoría…</option>';
+
+        if (data.ok && Array.isArray(data.items)) {
+          for (const it of data.items) {
+            const opt = document.createElement('option');
+            opt.value = it.id;
+            opt.textContent = it.nombre;
+            selSub.appendChild(opt);
+          }
+          selSub.disabled = false;
+          btnNew.disabled = false;
+          helper.textContent = data.items.length
+            ? 'Elija una subcategoría.'
+            : 'No hay subcategorías para esta categoría. Puede crear una nueva.';
+        } else {
+          helper.textContent = 'No fue posible cargar subcategorías.';
+        }
+      } catch (e) {
+        console.error(e);
+        helper.textContent = 'Error al cargar subcategorías.';
+      }
+    }
+
+    selCat?.addEventListener('change', () => {
+      const v = selCat.value;
+      if (v) {
+        cargarSubcategorias(v);
+      } else {
+        selSub.innerHTML = '<option value="">Seleccione subcategoría...</option>';
+        selSub.disabled = true;
+        btnNew.disabled = true;
+        helper.textContent = 'Seleccione primero una categoría.';
+      }
+    });
+
+    btnNew?.addEventListener('click', async () => {
+      const idCategoria = selCat?.value;
+      if (!idCategoria) {
+        alert('Selecciona primero una categoría.');
+        return;
+      }
+      const nombre = prompt('Nueva subcategoría para la categoría seleccionada:');
+      if (!nombre) return;
+
+      const form = new FormData();
+      form.append('id_categoria', idCategoria);
+      form.append('nombre', nombre);
+
+      try {
+        const resp = await fetch('/admin/subcategorias/nueva', { method: 'POST', body: form });
+        const data = await resp.json();
+        if (data.ok) {
+          await cargarSubcategorias(idCategoria);
+          selSub.value = String(data.id_subcategoria || '');
+          helper.textContent = data.created ? 'Subcategoría creada y seleccionada.' : 'Subcategoría ya existía; fue seleccionada.';
+        } else {
+          alert(data.error || 'No fue posible crear la subcategoría.');
+        }
+      } catch (e) {
+        console.error(e);
+        alert('Error de red al crear la subcategoría.');
+      }
+    });
+
+    // Precarga en modo edición: si hay categoría, cargar y preseleccionar subcategoría
+    const initialCat = selCat?.value;
+    if (initialCat) {
+      cargarSubcategorias(initialCat).then(() => {
+        {% if item and item.subcategoria_id %}
+        selSub.value = String({{ item.subcategoria_id }});
+        {% endif %}
+      });
+    }
+  });
+
+  // Preview de imágenes + autocompletar Nombre + disparar autocompletado de Slug/SEO
+  (function () {
+    const input = document.getElementById('imagenes');
+    const grid  = document.getElementById('preview');
+    const nombreInput = document.querySelector('input[name="nombre"]');
+
+    if (!input || !grid) return;
+
+    input.addEventListener('change', () => {
+      grid.innerHTML = '';
+      const files = Array.from(input.files || []);
+
+      // Si hay archivos y el Nombre está vacío, tomar el nombre del primer archivo
+      if (files.length > 0 && nombreInput && !nombreInput.value.trim()) {
+        let baseName = files[0].name.replace(/\.[^/.]+$/, ""); // sin extensión
+        baseName = baseName.replace(/[-_]+/g, " ").trim();     // limpiar guiones
+
+        // Setear Nombre
+        nombreInput.value = baseName;
+
+        // Disparar evento 'input' para que el autocompletado rellene Slug/SEO
+        nombreInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+        // Relleno de seguridad
+        const seoT = document.getElementById('seo_titulo');
+        const seoD = document.getElementById('seo_descripcion');
+        const editor = document.getElementById('editor');
+
+        if (seoT && !seoT.value.trim()) {
+          const t = baseName.length > 60 ? (baseName.slice(0, 60).split(' ').slice(0, -1).join(' ') || baseName.slice(0,60)) : baseName;
+          seoT.value = t.trim();
+        }
+        if (seoD && !seoD.value.trim()) {
+          let base = editor ? (editor.textContent || "").replace(/\s+/g, " ").trim() : "";
+          if (!base) base = baseName;
+          if (base.length > 160) {
+            const cut = base.slice(0,160);
+            const soft = cut.slice(0, Math.max(0, cut.lastIndexOf(" ")));
+            base = (soft || cut).trim();
+          }
+          seoD.value = base;
+        }
+      }
+
+      // Render de previews
+      files.slice(0, 12).forEach(file => {
+        const url = URL.createObjectURL(file);
+        const card = document.createElement('div');
+        card.className = 'border rounded overflow-hidden aspect-square bg-white';
+        const img = document.createElement('img');
+        img.src = url; img.alt = file.name; img.className = 'w-full h-full object-cover';
+        card.appendChild(img);
+        grid.appendChild(card);
+      });
+    });
+  })();
+
+  // --- Autocomplete de Marca ---
+  (function () {
+    const $input   = document.getElementById('marca_input');
+    const $list    = document.getElementById('marca_suggest');
+    const $id      = document.getElementById('marca_id');
+    const $nombreH = document.getElementById('marca_nombre');
+
+    if (!$input || !$list || !$id || !$nombreH) return;
+
+    let timer = null;
+    let lastQuery = "";
+
+    const hideList = () => { $list.classList.add('hidden'); $list.innerHTML = ""; };
+    const showList = () => { $list.classList.remove('hidden'); };
+
+    const renderItems = (items) => {
+      if (!items || !items.length) { hideList(); return; }
+      $list.innerHTML = items.map(it => `
+        <button type="button" data-id="${it.id}" data-nombre="${it.nombre}"
+                class="w-full text-left px-3 py-2 hover:bg-slate-100 flex items-center gap-2">
+          ${it.logo_url ? `<img src="${it.logo_url}" class="w-5 h-5 rounded object-contain">` : ''}
+          <span>${it.nombre}</span>
+        </button>
+      `).join("");
+      showList();
+    };
+
+    const search = async (q) => {
+      try {
+        const url = `/admin/marcas/buscar?q=${encodeURIComponent(q)}`;
+        const res = await fetch(url, { credentials: 'same-origin' });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        renderItems(data);
+      } catch (e) {
+        console.error("buscar marcas:", e);
+        hideList();
+      }
+    };
+
+    $input.addEventListener('input', () => {
+      const val = $input.value.trim();
+      // Al escribir, asumimos "marca nueva" hasta que elija algo
+      $id.value = "";
+      $nombreH.value = val;
+
+      if (val.length < 3) { hideList(); return; }
+
+      // debounce
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (val === lastQuery) return;
+        lastQuery = val;
+        search(val);
+      }, 220);
+    });
+
+    $list.addEventListener('click', (ev) => {
+      const btn = ev.target.closest('button[data-id]');
+      if (!btn) return;
+      const id = btn.getAttribute('data-id');
+      const nombre = btn.getAttribute('data-nombre');
+      // fija selección
+      $input.value = nombre;
+      $id.value = id;
+      $nombreH.value = nombre;  // coherencia
+      hideList();
+    });
+
+    // Cerrar lista si se hace click fuera
+    document.addEventListener('click', (ev) => {
+      if (!$list.contains(ev.target) && ev.target !== $input) hideList();
+    });
+  })();
+
+  // Editor rico + saneado de pegado
+  (function () {
+    const editor = document.getElementById('editor');
+    const output = document.getElementById('descripcion_web');
+    const btns = document.querySelectorAll('[data-cmd]');
+
+    // Toolbar
+    btns.forEach(b => b.addEventListener('click', () => {
+      document.execCommand(b.getAttribute('data-cmd'), false, null);
+      editor.focus();
+    }));
+    document.getElementById('btnLink').addEventListener('click', () => {
+      const url = prompt('URL del enlace:');
+      if (url) document.execCommand('createLink', false, url);
+      editor.focus();
+    });
+
+    // Paste con limpieza básica
+    editor.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const cd = e.clipboardData || window.clipboardData;
+      let htmlClip = cd.getData('text/html');
+
+      if (htmlClip) {
+        const sf = htmlClip.indexOf('<!--StartFragment-->');
+        const ef = htmlClip.indexOf('<!--EndFragment-->');
+        if (sf !== -1 && ef !== -1 && ef > sf) {
+          htmlClip = htmlClip.slice(sf + '<!--StartFragment-->'.length, ef);
+        } else {
+          try {
+            const doc = new DOMParser().parseFromString(htmlClip, 'text/html');
+            if (doc && doc.body) htmlClip = doc.body.innerHTML;
+          } catch (_) {}
+        }
+        htmlClip = htmlClip.replace(/<!--[\s\S]*?-->/g, '');
+
+        let html = htmlClip
+          .replace(/<div/gi, '<p').replace(/<\/div>/gi, '</p>')
+          .replace(/<\/?span[^>]*>/gi, '')
+          .replace(/\s(?:style|class|id|data-[\w-]+|on\w+)="[^"]*"/gi, '');
+
+        html = html.replace(/<(?!\/?(p|br|strong|b|em|i|u|ul|ol|li|a)(\s|>|\/))/gi, '&lt;');
+
+        html = html.replace(/<a([^>]*)>/gi, (m, attrs) => {
+          const hrefMatch = attrs.match(/href="([^"]*)"/i);
+          const href = hrefMatch ? href[1] : '';
+          if (!/^https?:|^mailto:|^tel:/i.test(href)) return '<a>';
+          return `<a href="${href}" target="_blank" rel="nofollow noopener">`;
+        });
+
+        document.execCommand('insertHTML', false, html);
+        return;
+      }
+
+      const text = cd.getData('text/plain') || '';
+      const htmlFromText = text
+        .replace(/\r\n/g, '\n')
+        .split(/\n{2,}/)
+        .map(para => `<p>${para.replace(/\n/g, '<br>')}</p>`)
+        .join('');
+      document.execCommand('insertHTML', false, htmlFromText);
+    });
+
+    const form = editor.closest('form');
+    form.addEventListener('submit', () => { output.value = editor.innerHTML; });
+  })();
+
+  // --- Autocompletar slug y SEO ---
+  (function () {
+    const deaccent = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const slugify = (s) => {
+      s = deaccent(String(s || "").trim().toLowerCase());
+      s = s.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+      return s || "";
+    };
+    const stripHtml = (html) => String(html || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+    const $nombre = document.querySelector('input[name="nombre"]');
+    const $slug   = document.getElementById('slug');
+    const $seoT   = document.getElementById('seo_titulo');
+    const $seoD   = document.getElementById('seo_descripcion');
+    const $editor = document.getElementById('editor');
+    const $descTA = document.getElementById('descripcion_web');
+
+    let seoTituloTouched = false;
+    let seoDescTouched   = false;
+    let slugTouched      = false;
+
+    if ($seoT)  $seoT.addEventListener('input', () => { seoTituloTouched = true; });
+    if ($seoD)  $seoD.addEventListener('input', () => { seoDescTouched   = true; });
+    if ($slug)  $slug.addEventListener('input',   () => { slugTouched    = true; });
+
+    const updateFromName = () => {
+      const name = ($nombre && $nombre.value) || "";
+      if (!slugTouched && $slug)   $slug.value = slugify(name);
+      if (!seoTituloTouched && $seoT) {
+        const max = 60;
+        let t = name.trim();
+        if (t.length > max) {
+          const cut = t.slice(0, max);
+          const soft = cut.slice(0, Math.max(0, cut.lastIndexOf(" ")));
+          t = (soft || cut).trim();
+        }
+        $seoT.value = t;
+      }
+    };
+
+    const updateSeoDesc = () => {
+      if (seoDescTouched || !$seoD) return;
+      const html = $editor ? $editor.innerHTML : "";
+      let base   = stripHtml(html);
+      if (!base) base = ($nombre && $nombre.value) || "";
+      const max = 160, min = 140;
+      if (base.length > max) {
+        let cut = base.slice(0, max);
+        const soft = cut.slice(0, Math.max(0, cut.lastIndexOf(" ")));
+        base = (soft || cut).trim();
+      }
+      if (base.length < min && $editor) {
+        const more = stripHtml($editor.innerHTML).slice(base.length);
+        base = (base + " " + more).trim().slice(0, max);
+      }
+      $seoD.value = base;
+    };
+
+    if ($nombre) {
+      $nombre.addEventListener('input', () => { updateFromName(); });
+      updateFromName();
+    }
+    if ($editor) {
+      $editor.addEventListener('input', () => { updateSeoDesc(); });
+      updateSeoDesc();
+    }
+
+    const form = document.querySelector('form');
+    if (form) {
+      form.addEventListener('submit', () => {
+        if ($descTA && $editor) $descTA.value = $editor.innerHTML;
+        if ($slug && !$slug.value && $nombre) $slug.value = slugify($nombre.value);
+        if ($seoT && !$seoT.value && $nombre) $seoT.value = $nombre.value.trim();
+        if ($seoD && !$seoD.value) updateSeoDesc();
+      });
+    }
+  })();
+</script>
+
+{% endblock %}

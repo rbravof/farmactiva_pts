@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{% block title %}Admin | Farmactiva{% endblock %}</title>
+  <link rel="icon" type="image/png" href="/static/images/logo/favicon.png">
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+        referrerpolicy="no-referrer">
+  {% block head %}{% endblock %}
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <!-- Topbar -->
+  <header class="bg-white border-b">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="/admin"><img src="/static/images/logo/logo.png" alt="Farmactiva" class="h-9"></a>
+        <span class="text-sm text-gray-500">Panel de administración</span>
+      </div>
+      <div class="flex items-center gap-4">
+        <a href="/" class="text-sm text-gray-600 hover:text-green-700">Ver tienda</a>
+        <span class="text-sm text-gray-600">Hola, {{ (user.nombre or user.usuario) if user else 'Admin' }}</span>
+        <a href="/admin/logout" class="text-sm text-red-600 hover:underline">Salir</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="max-w-7xl mx-auto px-4 py-6 grid grid-cols-12 gap-6">
+    <!-- Sidebar -->
+    <aside class="col-span-12 md:col-span-3 lg:col-span-3">
+      {% set path = request.url.path %}
+      <nav class="bg-white border rounded-xl shadow p-3 space-y-1">
+        <div class="px-2 py-1 text-xs uppercase text-gray-500">Catálogo</div>
+
+        <a href="/admin/marcas"
+           class="block px-3 py-2 rounded {{ 'bg-gray-100 text-gray-900 font-medium' if path.startswith('/admin/marcas') else 'text-gray-700 hover:bg-gray-50' }}">
+          Marcas
+        </a>
+        <a href="/admin/categorias"
+           class="block px-3 py-2 rounded {{ 'bg-gray-100 text-gray-900 font-medium' if path.startswith('/admin/categorias') else 'text-gray-700 hover:bg-gray-50' }}">
+          Categorías
+        </a>
+        <a href="/admin/productos"
+           class="block px-3 py-2 rounded {{ 'bg-gray-100 text-gray-900 font-medium' if path.startswith('/admin/productos') else 'text-gray-700 hover:bg-gray-50' }}">
+          Productos
+        </a>
+        <a href="/admin/menu"
+          class="block px-3 py-2 rounded {{ 'bg-gray-100 text-gray-900 font-medium' if path.startswith('/admin/menu') else 'text-gray-700 hover:bg-gray-50' }}">
+          Menú e-commerce
+        </a>
+
+        <div class="px-2 py-1 text-xs uppercase text-gray-500 mt-3">Operación</div>
+
+        <a href="/admin/pedidos"
+           class="block px-3 py-2 rounded {{ 'bg-gray-100 text-gray-900 font-medium' if path.startswith('/admin/pedidos') else 'text-gray-700 hover:bg-gray-50' }}">
+          Pedidos
+        </a>
+        <a href="/admin/clientes"
+           class="block px-3 py-2 rounded {{ 'bg-gray-100 text-gray-900 font-medium' if path.startswith('/admin/clientes') else 'text-gray-700 hover:bg-gray-50' }}">
+          Clientes
+        </a>
+
+        <div class="px-2 py-1 text-xs uppercase text-gray-500 mt-3">Configuración</div>
+
+        <a href="/admin/envios/tipos"
+           class="block px-3 py-2 rounded {{ 'bg-gray-100 text-gray-900 font-medium' if path.startswith('/admin/envios/tipos') else 'text-gray-700 hover:bg-gray-50' }}">
+          Tipos de envío
+        </a>
+
+        <a href="/admin/envios/tarifas"
+           class="block px-3 py-2 rounded {{ 'bg-gray-100 text-gray-900 font-medium' if path.startswith('/admin/envios/tarifas') else 'text-gray-700 hover:bg-gray-50' }}">
+          Tarifas de envío
+        </a>
+
+        <a href="/admin/usuarios"
+           class="block px-3 py-2 rounded {{ 'bg-gray-100 text-gray-900 font-medium' if path.startswith('/admin/usuarios') else 'text-gray-700 hover:bg-gray-50' }}">
+          Usuarios & Roles
+        </a>
+
+        <a href="/admin/bodegas"
+           class="block px-3 py-2 rounded {{ 'bg-gray-100 text-gray-900 font-medium' if path.startswith('/admin/bodegas') else 'text-gray-700 hover:bg-gray-50' }}">
+          Bodegas
+        </a>
+
+        <!-- NUEVO: Regla de Precios -->
+        <a href="/admin/pts/margenes"
+           class="block px-3 py-2 rounded {{ 'bg-gray-100 text-gray-900 font-medium' if path.startswith('/admin/pts/margenes') else 'text-gray-700 hover:bg-gray-50' }}">
+          Regla de Precios
+        </a>
+
+      </nav>
+    </aside>
+
+    <!-- Contenido -->
+    <main class="col-span-12 md:col-span-9 lg:col-span-9">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <footer class="text-center text-sm text-gray-500 py-8">© 2025 Farmactiva</footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,521 @@
+{% extends "base_admin.html" %}
+{% block title %}Nuevo pedido · Admin{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto p-6">
+  <a href="/admin/pedidos" class="text-sm text-slate-600 hover:underline">Volver</a>
+  <h1 class="text-2xl font-semibold mt-2">Nuevo pedido</h1>
+
+  <form id="pedidoForm" method="post" action="/admin/pedidos/nuevo" class="mt-5 space-y-6">
+    <!-- Paso 1: Items -->
+    <section id="step1" class="bg-white border rounded-xl p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-medium">Paso 1 · Items</h3>
+        <button id="btnAgregarFila" type="button" class="px-3 py-2 border rounded-lg">Agregar ítem</button>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm" id="tablaItems">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-2 py-2 text-right w-20">Cant.</th>
+              <th class="px-2 py-2">Producto</th>
+              <th class="px-2 py-2 text-right w-24">Precio</th>
+              <th class="px-2 py-2 text-right w-32">Descuento</th>
+              <th class="px-2 py-2 text-right w-28">Subtotal</th>
+              <th class="px-2 py-2 w-10"></th>
+            </tr>
+          </thead>
+          <tbody id="itemsBody"><!-- filas dinámicas --></tbody>
+          <tfoot>
+            <tr class="border-t">
+              <td colspan="4" class="px-3 py-2 text-right font-medium">Subtotal ítems</td>
+              <td class="px-3 py-2 text-right font-semibold"><span id="totalItems">$0</span></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <p class="text-xs text-slate-500 mt-2">Los precios se ingresan en CLP (enteros, sin decimales).</p>
+      <p class="text-xs mt-1 text-red-600">Al usar <strong>%</strong>, ingresa 0–100. Al usar <strong>$</strong>, ingresa el monto en CLP.</p>
+
+      <div class="flex justify-end mt-4">
+        <button id="btnContinuar" type="button" class="px-4 py-2 bg-green-600 text-white rounded-lg disabled:opacity-50" disabled>Continuar →</button>
+      </div>
+    </section>
+
+    <!-- Paso 2: Cliente & Envío -->
+    <section id="step2" class="bg-white border rounded-xl p-5 hidden">
+      <h3 class="font-medium mb-4">Paso 2 · Cliente & Envío</h3>
+
+      <!-- Cliente -->
+      <div class="bg-white rounded-lg">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div class="md:col-span-2 relative">
+            <label class="block text-sm mb-1">Cliente</label>
+            <input id="cli_query" type="text" class="w-full border rounded-lg px-3 py-2" placeholder="Buscar por nombre o RUT">
+            <input id="cli_id" name="id_cliente" type="hidden">
+            <div id="cli_suggest" class="absolute mt-1 w-full bg-white border rounded-lg shadow-lg hidden max-h-56 overflow-auto z-10"></div>
+            <p class="text-xs text-slate-500 mt-1">Escribe al menos 3 caracteres.</p>
+          </div>
+          <div>
+            <label class="block text-sm mb-1">Canal</label>
+            <select name="canal" class="w-full border rounded-lg px-3 py-2">
+              <option value="manual" selected>Manual</option>
+              <option value="web">Web</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Envío -->
+      <div class="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-sm mb-1">Tipo de envío</label>
+          <select id="tipo_envio" name="id_tipo_envio" class="w-full border rounded-lg px-3 py-2">
+            <option value="">— Selecciona —</option>
+          </select>
+        </div>
+        <div id="wrap_dir" class="md:col-span-2">
+          <label class="block text-sm mb-1">Dirección de envío</label>
+          <select id="cli_dir" name="id_direccion" class="w-full border rounded-lg px-3 py-2" disabled>
+            <option value="">— Selecciona —</option>
+          </select>
+          <p id="dirHelp" class="text-xs text-slate-500 mt-1">Se cargan automáticamente al elegir el cliente.</p>
+        </div>
+      </div>
+
+      <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-sm mb-1">Costo envío</label>
+          <input id="envio_clp" name="envio_clp" type="text" class="w-full border rounded-lg px-3 py-2 bg-gray-50" readonly value="$0">
+        </div>
+        <div class="md:col-span-2">
+          <label class="block text-sm mb-1">Observación (opcional)</label>
+          <input name="observacion" type="text" class="w-full border rounded-lg px-3 py-2" placeholder="Notas para el pedido">
+        </div>
+      </div>
+
+      <!-- Resumen -->
+      <div class="mt-6 border rounded-lg p-4">
+        <div class="flex items-center justify-between">
+          <div class="text-sm text-slate-600">Subtotal ítems (sin IVA)</div>
+          <div class="font-medium" id="resSubNeto">$0</div>
+        </div>
+        <div class="flex items-center justify-between mt-1">
+          <div class="text-sm text-slate-600">Descuento</div>
+          <div class="font-medium" id="resDesc">-$0</div>
+        </div>
+        <div class="flex items-center justify-between mt-1">
+          <div class="text-sm text-slate-600">Envío</div>
+          <div class="font-medium" id="resEnvio">$0</div>
+        </div>
+        <div class="flex items-center justify-between mt-1">
+          <div class="text-sm text-slate-600">IVA (19%)</div>
+          <div class="font-medium" id="resIva">$0</div>
+        </div>
+        <div class="flex items-center justify-between mt-2 border-t pt-2">
+          <div class="text-sm font-semibold">Total</div>
+          <div class="text-lg font-semibold" id="resTotal">$0</div>
+        </div>
+      </div>
+
+      <div class="flex justify-between mt-5">
+        <button id="btnAtras" type="button" class="px-4 py-2 border rounded-lg">← Atrás</button>
+        <div class="flex gap-2">
+          <button name="accion" value="crear_enviar_link" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">Crear pedido y enviar link</button>
+          <button name="accion" value="solo_crear" class="px-4 py-2 bg-green-600 text-white rounded-lg">Solo crear</button>
+        </div>
+      </div>
+    </section>
+
+    <input type="hidden" id="id_bodega" name="id_bodega" value="">
+  </form>
+</div>
+
+<script>
+  // ===== Helpers y estado global =====
+  const fmt = new Intl.NumberFormat('es-CL', { style:'currency', currency:'CLP', maximumFractionDigits:0 });
+  const IVA_RATE = 0.19;
+  const grossToNet = (g) => Math.round((g || 0) / (1 + IVA_RATE));
+  const ivaFromGross = (g) => (g || 0) - grossToNet(g);
+
+  // Estado compartido entre pasos
+  window.__pedido = { itemsGross: 0, descGross: 0 };
+
+  function clampInt(v, min, max) {
+    v = parseInt((v||'').toString().replace(/[^\d]/g,''), 10);
+    if (isNaN(v)) v = 0;
+    if (min != null) v = Math.max(min, v);
+    if (max != null) v = Math.min(max, v);
+    return v;
+  }
+  function parseCLP(str){
+    if (!str) return 0;
+    const n = parseInt(str.toString().replace(/[^\d]/g,''),10);
+    return isNaN(n) ? 0 : n;
+  }
+
+  // Actualiza resumen (usa brutos y muestra neto e IVA incluido, sin sumar IVA al total)
+  window.updateTotalConEnvio = function(){
+    const itemsGross = window.__pedido.itemsGross || parseCLP(document.getElementById('totalItems')?.textContent);
+    const envioGross = parseCLP(document.getElementById('resEnvio')?.textContent);
+
+    const itemsNet  = grossToNet(itemsGross);
+    const ivaTotal  = ivaFromGross(itemsGross) + ivaFromGross(envioGross);
+    const total     = itemsGross + envioGross;
+
+    const $subNeto = document.getElementById('resSubNeto');
+    const $desc    = document.getElementById('resDesc');
+    const $iva     = document.getElementById('resIva');
+    const $total   = document.getElementById('resTotal');
+
+    if ($subNeto) $subNeto.textContent = fmt.format(itemsNet);
+    if ($desc)    $desc.textContent    = '-' + fmt.format(window.__pedido.descGross || 0);
+    if ($iva)     $iva.textContent     = fmt.format(ivaTotal);
+    if ($total)   $total.textContent   = fmt.format(total);
+  };
+
+  // ===== Paso 1: Items =====
+  (function(){
+    const $body  = document.getElementById('itemsBody');
+    const $btnAdd = document.getElementById('btnAgregarFila');
+    const $subtotal = document.getElementById('totalItems');
+    const $btnContinuar = document.getElementById('btnContinuar');
+
+    function hasAtLeastOneItem() {
+      return $body.querySelectorAll('tr').length > 0;
+    }
+    function updateContinueEnabled(){
+      $btnContinuar.disabled = !hasAtLeastOneItem();
+    }
+    async function searchProd(q){
+      const r = await fetch(`/admin/productos/buscar?q=${encodeURIComponent(q)}`);
+      return await r.json();
+    }
+    async function fetchPrecio(idProducto){
+      const r = await fetch(`/admin/productos/precio?id_producto=${encodeURIComponent(idProducto)}`);
+      const data = await r.json().catch(()=> ({}));
+      if (data && data.ok && Number.isInteger(data.precio_sugerido)) return data.precio_sugerido;
+      if (data && Number.isInteger(data.precio)) return data.precio;
+      return 0;
+    }
+
+    function recalcTotals(){
+      let total = 0;
+      let totalDesc = 0;
+
+      $body.querySelectorAll('tr').forEach(tr=>{
+        const q  = clampInt(tr.querySelector('[data-qty]').value, 1, 99999);
+        const pu = clampInt(tr.querySelector('[data-precio]').value, 0, 9999999);
+        const dt = tr.querySelector('[data-desc-tipo]').value; // 'monto' | 'porcentaje'
+        const dv = clampInt(tr.querySelector('[data-desc-valor]').value, 0, 9999999);
+
+        let desc = 0;
+        if (dt === 'monto') {
+          desc = Math.min(dv, q * pu);
+        } else {
+          const pct = Math.min(100, dv);
+          desc = Math.floor(q * pu * (pct / 100));
+        }
+        totalDesc += desc;
+
+        const sub = Math.max(0, q * pu - desc);
+        tr.querySelector('[data-subtotal]').textContent = fmt.format(sub);
+        total += sub;
+      });
+
+      window.__pedido.itemsGross = total;
+      window.__pedido.descGross  = totalDesc;
+
+      $subtotal.textContent = fmt.format(total);
+
+      if (document.getElementById('resEnvio')) {
+        window.updateTotalConEnvio();
+      }
+
+      updateContinueEnabled();
+    }
+
+    function wireRow(tr){
+      const wrap = tr.querySelector('.relative');
+      const hid  = wrap.querySelector('input[type="hidden"][data-id-prod]');
+      const txt  = wrap.querySelector('input[type="text"][data-buscar]');
+      const box  = wrap.querySelector('div[data-suggest]');
+      const qty  = tr.querySelector('[data-qty]');
+      const pu   = tr.querySelector('[data-precio]');
+      const dBtn = tr.querySelector('[data-desc-toggle]');
+      const dTyp = tr.querySelector('[data-desc-tipo]');
+      const dVal = tr.querySelector('[data-desc-valor]');
+
+      let timer=null, last="";
+
+      const hide = ()=>{ box.classList.add('hidden'); box.innerHTML=''; };
+      const show = ()=>{ box.classList.remove('hidden'); };
+
+      const render = (items)=>{
+        if (!items?.length){ hide(); return; }
+        box.innerHTML = items.map(it=>{
+          const id     = it.id ?? it.id_producto;
+          const nombre = it.nombre ?? it.titulo ?? '(sin nombre)';
+          const ean    = it.ean ? ` <span class="text-xs text-slate-500">(${it.ean})</span>` : '';
+          return `<button type="button" data-id="${id}" data-nombre="${nombre}"
+                    class="w-full text-left px-3 py-2 hover:bg-slate-100">${nombre}${ean}</button>`;
+        }).join('');
+        show();
+      };
+
+      txt.addEventListener('input', ()=>{
+        hid.value="";
+        const v = txt.value.trim();
+        if (v.length < 2){ hide(); return; }
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(async ()=>{
+          if (v===last) return; last=v;
+          try{ render(await searchProd(v)); }catch(e){ console.error(e); hide(); }
+        }, 220);
+      });
+
+      box.addEventListener('click', async (ev)=>{
+        const b = ev.target.closest('button[data-id]');
+        if (!b) return;
+        hid.value = b.dataset.id;
+        txt.value = b.dataset.nombre;
+        hide();
+        if (clampInt(pu.value, 0, 9999999) === 0){
+          try {
+            const p = await fetchPrecio(hid.value);
+            if (p > 0) { pu.value = p; }
+          } catch(e){ console.error(e); }
+        }
+        recalcTotals();
+      });
+
+      document.addEventListener('click',(ev)=>{ if(!(box.contains(ev.target)||ev.target===txt)) hide(); });
+
+      qty.addEventListener('input', ()=>{ qty.value = clampInt(qty.value, 1, 99999); recalcTotals(); });
+      pu.addEventListener('input',  ()=>{ pu.value  = clampInt(pu.value, 0, 9999999);  recalcTotals(); });
+
+      dBtn.addEventListener('click', ()=>{
+        const now = dTyp.value === 'monto' ? 'porcentaje' : 'monto';
+        dTyp.value = now;
+        dBtn.textContent = now === 'monto' ? '$' : '%';
+        recalcTotals();
+      });
+      dVal.addEventListener('input', ()=>{ dVal.value = clampInt(dVal.value, 0, 9999999); recalcTotals(); });
+    }
+
+    function nuevaFila(){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="px-2 py-2 text-right">
+          <input data-qty type="number" min="1" max="99999" value="1"
+                 class="w-20 text-right border rounded-lg px-2 py-1">
+        </td>
+        <td class="px-2 py-2">
+          <div class="relative">
+            <input type="hidden" name="items[][id_producto]" data-id-prod>
+            <input type="text" data-buscar class="w-full border rounded-lg px-3 py-2" placeholder="Buscar producto…">
+            <div class="absolute mt-1 w-full bg-white border rounded-lg shadow-lg hidden max-h-56 overflow-auto z-10" data-suggest></div>
+          </div>
+        </td>
+        <td class="px-2 py-2 text-right">
+          <input data-precio type="number" min="0" max="9999999" value="0"
+                 class="w-24 text-right border rounded-lg px-2 py-1" name="items[][precio_unitario]">
+        </td>
+        <td class="px-2 py-2 text-right">
+          <div class="flex items-center justify-end gap-1">
+            <button type="button" class="px-2 py-1 border rounded text-xs" title="Tipo de descuento" data-desc-toggle>$</button>
+            <input type="hidden" data-desc-tipo name="items[][descuento_tipo]" value="monto">
+            <input type="number" data-desc-valor name="items[][descuento_valor]" value="0" min="0" max="9999999"
+                   class="w-24 text-right border rounded-lg px-2 py-1" placeholder="0">
+          </div>
+        </td>
+        <td class="px-2 py-2 text-right"><span data-subtotal>$0</span></td>
+        <td class="px-2 py-2 text-center">
+          <button type="button" class="text-red-600" data-del>&times;</button>
+        </td>`;
+      document.getElementById('itemsBody').appendChild(tr);
+      wireRow(tr);
+      recalcTotals();
+      updateContinueEnabled();
+    }
+
+    $btnAdd.addEventListener('click', nuevaFila);
+    document.getElementById('itemsBody').addEventListener('click', (ev)=>{
+      const del = ev.target.closest('[data-del]');
+      if (!del) return;
+      del.closest('tr').remove();
+      recalcTotals();
+      updateContinueEnabled();
+    });
+
+    // Primera fila por defecto
+    nuevaFila();
+  })();
+
+  // ===== Paso 2: Cliente & Envío =====
+  (function(){
+    const $step1 = document.getElementById('step1');
+    const $step2 = document.getElementById('step2');
+    const $btnContinuar = document.getElementById('btnContinuar');
+    const $btnAtras = document.getElementById('btnAtras');
+
+    const $cliQ = document.getElementById('cli_query');
+    const $cliId = document.getElementById('cli_id');
+    const $cliBox = document.getElementById('cli_suggest');
+    const $dirSel = document.getElementById('cli_dir');
+    const $tipoSel = document.getElementById('tipo_envio');
+    const $envio = document.getElementById('envio_clp');
+    const $resEnvio = document.getElementById('resEnvio');
+
+    // <<< Declaramos UNA sola vez y usamos SIEMPRE este nombre >>>
+    const $idBodega = document.getElementById('id_bodega');
+
+    // Navegación
+    $btnContinuar.addEventListener('click', ()=>{
+      $step1.classList.add('hidden');
+      $step2.classList.remove('hidden');
+      if ($tipoSel.options.length <= 1) { loadTiposEnvio(); }
+      window.updateTotalConEnvio();
+    });
+    $btnAtras.addEventListener('click', ()=>{
+      $step2.classList.add('hidden');
+      $step1.classList.remove('hidden');
+    });
+
+    // Autocomplete cliente
+    let t=null, last="";
+    const hide = ()=>{ $cliBox.classList.add('hidden'); $cliBox.innerHTML=''; };
+    const show = ()=>{ $cliBox.classList.remove('hidden'); };
+
+    async function buscarClientes(q){
+      const r = await fetch(`/admin/clientes/buscar?q=${encodeURIComponent(q)}`);
+      return await r.json();
+    }
+    function renderClientes(items){
+      if (!items?.length){ hide(); return; }
+      $cliBox.innerHTML = items.map(it=>`
+        <button type="button" data-id="${it.id}" data-nombre="${it.nombre}"
+                class="w-full text-left px-3 py-2 hover:bg-slate-100">
+          ${it.nombre}${it.rut?` <span class="text-xs text-slate-500">(${it.rut})</span>`:''}
+        </button>`).join('');
+      show();
+    }
+    $cliQ.addEventListener('input', ()=>{
+      const v=$cliQ.value.trim();
+      $cliId.value="";
+      if (v.length<3){ hide(); return; }
+      if (t) clearTimeout(t);
+      t=setTimeout(async()=>{
+        if (v===last) return; last=v;
+        try{ renderClientes(await buscarClientes(v)); }catch(e){ console.error(e); hide(); }
+      }, 220);
+    });
+    $cliBox.addEventListener('click', async (ev)=>{
+      const b = ev.target.closest('button[data-id]');
+      if (!b) return;
+      $cliId.value = b.dataset.id;
+      $cliQ.value = b.dataset.nombre;
+      hide();
+      await cargarDireccionesCliente($cliId.value);
+    });
+    document.addEventListener('click',(ev)=>{ if(!($cliBox.contains(ev.target)||ev.target===$cliQ)) hide(); });
+
+    async function cargarDireccionesCliente(idCliente){
+      $dirSel.innerHTML = `<option value="">Cargando…</option>`;
+      $dirSel.disabled = true;
+      try{
+        const r = await fetch(`/admin/clientes/${encodeURIComponent(idCliente)}/direcciones`);
+        const data = await r.json();
+        $dirSel.innerHTML = `<option value="">— Selecciona —</option>`;
+        if (data.ok && Array.isArray(data.items) && data.items.length){
+          for (const it of data.items){
+            const opt = document.createElement('option');
+            opt.value = it.id_direccion;
+            opt.textContent = `${it.etiqueta ? it.etiqueta+' · ' : ''}${it.calle_numero}, ${it.comuna || ''}`;
+            opt.dataset.id_comuna = it.id_comuna || '';
+            if (it.es_principal) opt.selected = true;
+            $dirSel.appendChild(opt);
+          }
+          $dirSel.disabled = false;
+        } else {
+          $dirSel.disabled = true;
+        }
+        calcularEnvio();
+      } catch(e){
+        console.error(e);
+        $dirSel.innerHTML = `<option value="">— No disponible —</option>`;
+        $dirSel.disabled = true;
+      }
+    }
+
+    // Tipos de envío
+    async function loadTiposEnvio(){
+      try{
+        const r = await fetch(`/admin/api/envios/tipos`);
+        const data = await r.json();
+        const tipos = Array.isArray(data.items) ? data.items : [];
+        $tipoSel.innerHTML = `<option value="">— Selecciona —</option>`;
+        tipos.forEach(t=>{
+          const opt = document.createElement('option');
+          opt.value = t.id;
+          opt.textContent = t.nombre;
+          opt.dataset.requiere = String(!!t.requiere_direccion);
+          $tipoSel.appendChild(opt);
+        });
+      }catch(e){
+        console.error(e);
+        $tipoSel.innerHTML = `<option value="">— No disponible —</option>`;
+      }
+    }
+    function tipoSeleccionadoRequiereDireccion(){
+      const opt = $tipoSel.options[$tipoSel.selectedIndex];
+      return opt ? (opt.dataset.requiere === 'true') : false;
+    }
+
+    async function calcularEnvio(){
+      const idTipo = $tipoSel.value;
+      if (!idTipo){ setEnvio(0); return; }
+
+      if (tipoSeleccionadoRequiereDireccion()){
+        const optDir = $dirSel.options[$dirSel.selectedIndex];
+        const idComuna = optDir ? optDir.dataset.id_comuna : '';
+        if (!idComuna){ setEnvio(0); return; }
+
+        let url = `/admin/envios/tarifa?id_tipo_envio=${encodeURIComponent(idTipo)}&id_comuna=${encodeURIComponent(idComuna)}`;
+        const idBod = ($idBodega.value||'').trim();
+        if (idBod) url += `&id_bodega=${encodeURIComponent(idBod)}`;
+        try{
+          const r = await fetch(url);
+          const data = await r.json();
+          setEnvio(Number.isInteger(data.costo) ? data.costo : (data.precio ?? 0));
+        }catch(e){ console.error(e); setEnvio(0); }
+      } else {
+        try{
+          let url = `/admin/envios/tarifa?id_tipo_envio=${encodeURIComponent(idTipo)}`;
+          const idBod = ($idBodega.value||'').trim();
+          if (idBod) url += `&id_bodega=${encodeURIComponent(idBod)}`;
+          const r = await fetch(url);
+          const data = await r.json();
+          setEnvio(Number.isInteger(data.costo) ? data.costo : (data.precio ?? 0));
+        }catch(e){ console.error(e); setEnvio(0); }
+      }
+    }
+
+    function setEnvio(v){
+      v = clampInt(v, 0, 999999999);
+      $envio.value = fmt.format(v);
+      $resEnvio.textContent = fmt.format(v);
+      window.updateTotalConEnvio();
+    }
+
+    $tipoSel.addEventListener('change', ()=>{
+      const req = tipoSeleccionadoRequiereDireccion();
+      document.getElementById('cli_dir').disabled = !req || !document.getElementById('cli_id').value;
+      calcularEnvio();
+    });
+    document.getElementById('cli_dir').addEventListener('change', calcularEnvio);
+  })();
+</script>
+{% endblock %}

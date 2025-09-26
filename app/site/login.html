@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tienda | Farmactiva</title>
+  <link rel="icon" type="image/png" href="/static/images/logo/favicon.png">
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+  <style>
+    .card{transition:transform .2s, box-shadow .2s}
+    .card:hover{transform:translateY(-4px); box-shadow:0 12px 22px rgba(0,0,0,.08)}
+    .badge{font-size:.75rem}
+    .price-list{font-variant-numeric: tabular-nums}
+    .line-through-10{position:relative}
+    .line-through-10::after{content:"";position:absolute;left:0;right:0;top:55%;height:2px;background:#ef4444;transform:rotate(-8deg)}
+    /* menú categorías */
+    .nav-link{position:relative}
+    .nav-link > .dropdown{display:none; position:absolute; left:0; top:100%; min-width:14rem; z-index:50}
+    .nav-link:hover > .dropdown{display:block}
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+  <!-- Barra de estado de suscripción -->
+  <div id="estadoBar" class="hidden bg-yellow-50 text-yellow-800 text-sm">
+    <div class="max-w-7xl mx-auto px-4 py-2 flex items-center gap-2">
+      <i class="fas fa-info-circle"></i>
+      <span id="estadoMsg">Inicia sesión para ver precios a costo.</span>
+      <a href="/login" class="ml-auto text-yellow-900 underline font-medium">Iniciar sesión</a>
+    </div>
+  </div>
+
+  <!-- HEADER (fila 1: logo, búsqueda, cuenta, carrito) -->
+  <header class="bg-white shadow-sm sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4">
+      <div class="flex items-center justify-between py-4">
+        <a href="/"><img src="/static/Images/logo/logo.png" alt="Farmactiva" class="h-10 md:h-12"></a>
+
+        <!-- Buscador desktop -->
+        <div class="hidden md:flex flex-1 max-w-3xl mx-6">
+          <div class="relative w-full">
+            <input id="q" type="search" placeholder="Busca un medicamento o producto…" class="w-full border border-gray-200 rounded-lg pl-11 pr-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none bg-gray-50" />
+            <i class="fas fa-search absolute left-3 top-2.5 text-gray-400"></i>
+          </div>
+        </div>
+
+        <!-- Acciones -->
+        <nav class="flex items-center gap-4">
+          <a href="/login" id="loginLink" class="text-sm font-medium hover:text-green-600"><i class="far fa-user mr-2"></i> Iniciar sesión</a>
+          <a href="/perfil" id="perfilLink" class="hidden text-sm font-medium hover:text-green-600"><i class="far fa-user mr-2"></i> Mi cuenta</a>
+          <a href="/carrito" class="relative text-sm font-medium hover:text-green-600">
+            <i class="fas fa-shopping-cart mr-2"></i> Carrito
+            <span id="cartCount" class="absolute -top-2 -right-3 bg-green-600 text-white text-xs rounded-full px-1.5">0</span>
+          </a>
+        </nav>
+      </div>
+
+      <!-- Buscador móvil -->
+      <div class="md:hidden pb-3">
+        <div class="relative">
+          <input id="qMobile" type="search" placeholder="Buscar productos…" class="w-full border border-gray-200 rounded-lg pl-11 pr-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none bg-gray-50" />
+          <i class="fas fa-search absolute left-3 top-2.5 text-gray-400"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- HEADER (fila 2: menú de categorías) -->
+    <div class="bg-white border-t border-gray-100">
+      <nav class="max-w-7xl mx-auto px-4">
+        <ul class="flex items-center gap-6 text-sm font-medium text-green-900 py-3 overflow-x-auto">
+          <!-- (categorías fijas) -->
+          <li class="nav-link">
+            <a href="/categoria/medicamentos" class="hover:text-green-700 flex items-center gap-2">Medicamentos <i class="fas fa-chevron-down text-xs"></i></a>
+            <div class="dropdown bg-white border border-gray-100 rounded-lg shadow-lg mt-2">
+              <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <a href="/categoria/medicamentos/genericos" class="px-3 py-2 rounded hover:bg-gray-50">Genéricos</a>
+                <a href="/categoria/medicamentos/bioequivalentes" class="px-3 py-2 rounded hover:bg-gray-50">Bioequivalentes</a>
+                <a href="/categoria/medicamentos/venta-libre" class="px-3 py-2 rounded hover:bg-gray-50">Venta libre</a>
+                <a href="/categoria/medicamentos/receta" class="px-3 py-2 rounded hover:bg-gray-50">Con receta</a>
+              </div>
+            </div>
+          </li>
+          <li class="nav-link">
+            <a href="/categoria/dermocosmetica" class="hover:text-green-700 flex items-center gap-2">Dermocosmética <i class="fas fa-chevron-down text-xs"></i></a>
+            <div class="dropdown bg-white border border-gray-100 rounded-lg shadow-lg mt-2">
+              <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <a href="/categoria/dermocosmetica/limpieza" class="px-3 py-2 rounded hover:bg-gray-50">Limpieza</a>
+                <a href="/categoria/dermocosmetica/hidratacion" class="px-3 py-2 rounded hover:bg-gray-50">Hidratación</a>
+                <a href="/categoria/dermocosmetica/antiage" class="px-3 py-2 rounded hover:bg-gray-50">Antiage</a>
+                <a href="/categoria/dermocosmetica/proteccion-solar" class="px-3 py-2 rounded hover:bg-gray-50">Protección solar</a>
+              </div>
+            </div>
+          </li>
+          <li class="nav-link">
+            <a href="/categoria/perfumeria" class="hover:text-green-700 flex items-center gap-2">Perfumería <i class="fas fa-chevron-down text-xs"></i></a>
+            <div class="dropdown bg-white border border-gray-100 rounded-lg shadow-lg mt-2">
+              <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <a href="/categoria/perfumeria/damas" class="px-3 py-2 rounded hover:bg-gray-50">Damas</a>
+                <a href="/categoria/perfumeria/caballeros" class="px-3 py-2 rounded hover:bg-gray-50">Caballeros</a>
+                <a href="/categoria/perfumeria/unisex" class="px-3 py-2 rounded hover:bg-gray-50">Unisex</a>
+                <a href="/categoria/perfumeria/sets" class="px-3 py-2 rounded hover:bg-gray-50">Sets</a>
+              </div>
+            </div>
+          </li>
+          <li class="nav-link">
+            <a href="/categoria/vitaminas" class="hover:text-green-700 flex items-center gap-2">Vitaminas <i class="fas fa-chevron-down text-xs"></i></a>
+            <div class="dropdown bg-white border border-gray-100 rounded-lg shadow-lg mt-2">
+              <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <a href="/categoria/vitaminas/multivitaminicos" class="px-3 py-2 rounded hover:bg-gray-50">Multivitamínicos</a>
+                <a href="/categoria/vitaminas/minerales" class="px-3 py-2 rounded hover:bg-gray-50">Minerales</a>
+                <a href="/categoria/vitaminas/omega" class="px-3 py-2 rounded hover:bg-gray-50">Omega</a>
+                <a href="/categoria/vitaminas/infantil" class="px-3 py-2 rounded hover:bg-gray-50">Infantil</a>
+              </div>
+            </div>
+          </li>
+          <li class="nav-link">
+            <a href="/categoria/suplementos" class="hover:text-green-700 flex items-center gap-2">Suplementos <i class="fas fa-chevron-down text-xs"></i></a>
+            <div class="dropdown bg-white border border-gray-100 rounded-lg shadow-lg mt-2">
+              <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <a href="/categoria/suplementos/deportivos" class="px-3 py-2 rounded hover:bg-gray-50">Deportivos</a>
+                <a href="/categoria/suplementos/mascotas" class="px-3 py-2 rounded hover:bg-gray-50">Mascotas</a>
+                <a href="/categoria/suplementos/herbales" class="px-3 py-2 rounded hover:bg-gray-50">Herbales</a>
+                <a href="/categoria/suplementos/otros" class="px-3 py-2 rounded hover:bg-gray-50">Otros</a>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="bg-gradient-to-r from-blue-900 to-blue-700 text-white">
+    <div class="max-w-7xl mx-auto px-4 py-10 md:py-14">
+      <div class="flex flex-col md:flex-row items-center gap-8">
+        <div class="flex-1">
+          <h1 class="text-3xl md:text-4xl font-bold mb-3">Tienda Farmactiva</h1>
+          <p class="text-blue-100 text-lg">Si tu suscripción está activa, verás <span class="font-semibold">precio a costo</span> y podrás comprar con despacho a domicilio.</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <a href="/tipo_contrato.html" class="bg-green-500 hover:bg-green-600 text-white px-5 py-2.5 rounded-lg font-semibold"><i class="fas fa-star mr-2"></i> Suscribirme</a>
+          <a href="/beneficios" class="bg-white text-blue-800 hover:bg-blue-50 px-5 py-2.5 rounded-lg font-semibold"><i class="fas fa-info-circle mr-2"></i> Ver beneficio</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Categorías rápidas -->
+  <section class="max-w-7xl mx-auto px-4 py-8">
+    <h2 class="text-xl font-semibold mb-4">Categorías</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <a href="/categoria/cardiometabolico" class="bg-white p-4 rounded-xl shadow-sm card flex items-center gap-3">
+        <i class="fas fa-prescription-bottle-alt text-green-600"></i><span>Cardiometabólico</span>
+      </a>
+      <a href="/categoria/respiratorio" class="bg-white p-4 rounded-xl shadow-sm card flex items-center gap-3">
+        <i class="fas fa-lungs text-green-600"></i><span>Respiratorio</span>
+      </a>
+      <a href="/categoria/alergias" class="bg-white p-4 rounded-xl shadow-sm card flex items-center gap-3">
+        <i class="fas fa-allergies text-green-600"></i><span>Alergias</span>
+      </a>
+      <a href="/categoria/genericos" class="bg-white p-4 rounded-xl shadow-sm card flex items-center gap-3">
+        <i class="fas fa-capsules text-green-600"></i><span>Genéricos</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- Listado de productos -->
+  <main class="max-w-7xl mx-auto px-4 pb-16">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xl font-semibold">Destacados</h2>
+      <div class="text-sm text-gray-500">Precios en CLP <span id="tagEstado" class="ml-2 badge px-2 py-0.5 rounded bg-gray-100">visitante</span></div>
+    </div>
+
+    <div id="grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <!-- Cards renderizadas por JS -->
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-gray-900 text-gray-300">
+    <div class="max-w-7xl mx-auto px-4 py-10 grid md:grid-cols-4 gap-8">
+      <div class="md:col-span-2">
+        <img src="/static/Images/logo/logo.png" class="h-10 mb-4" alt="Farmactiva">
+        <p>Acceso a medicamentos con precios justos y transparentes.</p>
+      </div>
+      <div>
+        <h4 class="font-semibold mb-2 text-white">Ayuda</h4>
+        <ul class="space-y-1 text-sm">
+          <li><a href="/preguntas" class="hover:text-white">Preguntas frecuentes</a></li>
+          <li><a href="/contacto" class="hover:text-white">Contacto</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 class="font-semibold mb-2 text-white">Legal</h4>
+        <ul class="space-y-1 text-sm">
+          <li><a href="/terminos" class="hover:text-white">Términos y condiciones</a></li>
+          <li><a href="/privacidad" class="hover:text-white">Privacidad</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="border-t border-gray-800 text-sm text-gray-400">
+      <div class="max-w-7xl mx-auto px-4 py-4">&copy; 2025 Farmactiva</div>
+    </div>
+  </footer>
+
+<script>
+  // -----------------------------
+  // Mock productos
+  // -----------------------------
+  const productos = [
+    {id:1, nombre:"Losartán 50 mg", desc:"30 comprimidos", img:"", precioPublico: 4990, precioCosto: 2279, receta:false},
+    {id:2, nombre:"Loratadina 10 mg", desc:"10 tabletas", img:"", precioPublico: 3290, precioCosto: 1487, receta:false},
+    {id:3, nombre:"Omeprazol 20 mg", desc:"14 cápsulas", img:"", precioPublico: 5290, precioCosto: 1751, receta:false},
+    {id:4, nombre:"Metformina 850 mg", desc:"60 comprimidos", img:"", precioPublico: 8490, precioCosto: 5623, receta:true},
+    {id:5, nombre:"Ibuprofeno 400 mg", desc:"20 comprimidos", img:"", precioPublico: 3990, precioCosto: 1663, receta:false},
+    {id:6, nombre:"Paracetamol 500 mg", desc:"20 comprimidos (B)", img:"", precioPublico: 2990, precioCosto: 959,  receta:false},
+  ];
+
+  // Miniatura dummy (constante)
+  const DUMMY_IMG = "/static/Images/productos/Kitadol_(B)_Paracetamol_500_mg_24_Comprimidos.jpg";
+
+  // -----------------------------
+  // Estado sesión / suscripción
+  // -----------------------------
+  let suscripcionActiva = false;
+  let logged = false;
+
+  async function cargarEstado() {
+    try {
+      const r = await fetch('/api/suscripcion/estado', {credentials:'include'});
+      if (r.ok) {
+        const j = await r.json();
+        suscripcionActiva = !!j.activa;
+        logged = !!j.logged;
+      }
+    } catch(e) { /* visitante */ }
+    pintarEstado();
+  }
+
+  function pintarEstado() {
+    const bar = document.getElementById('estadoBar');
+    const msg = document.getElementById('estadoMsg');
+    const tag = document.getElementById('tagEstado');
+    const loginLink = document.getElementById('loginLink');
+    const perfilLink = document.getElementById('perfilLink');
+
+    if (logged) { loginLink.classList.add('hidden'); perfilLink.classList.remove('hidden'); }
+    if (!suscripcionActiva) {
+      bar.classList.remove('hidden');
+      msg.textContent = 'Tu suscripción no está activa. Verás precio público. Suscríbete para comprar a costo.';
+      tag.textContent = 'precio público';
+      tag.className = "ml-2 badge px-2 py-0.5 rounded bg-gray-200";
+    } else {
+      bar.classList.add('hidden');
+      tag.textContent = 'suscripción activa';
+      tag.className = "ml-2 badge px-2 py-0.5 rounded bg-green-100 text-green-800";
+    }
+  }
+
+  // -----------------------------
+  // Render de productos (stretched link a producto dummy)
+  // -----------------------------
+  function money(n){return n.toLocaleString('es-CL')}
+  function render() {
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '';
+    productos.forEach(p => {
+      const puedeCosto = suscripcionActiva;
+      const precioMostrar = puedeCosto ? p.precioCosto : p.precioPublico;
+
+      const upperBlock = `
+        <div class="aspect-w-1 aspect-h-1 bg-gray-100 flex items-center justify-center">
+          <img
+            src="${p.img || DUMMY_IMG}"
+            alt="${p.nombre}"
+            class="object-contain h-36 w-full"
+            onerror="this.onerror=null;this.src='${DUMMY_IMG}';"
+          >
+        </div>
+        <div class="p-4 flex-1 flex flex-col">
+          <div class="flex items-start justify-between">
+            <h3 class="font-semibold text-sm">${p.nombre}</h3>
+            ${p.receta ? '<span class="badge bg-red-100 text-red-700 px-2 py-0.5 rounded">Receta</span>' : ''}
+          </div>
+          <p class="text-xs text-gray-500 mt-1">${p.desc || ''}</p>
+          <div class="mt-3 price-list">
+            ${puedeCosto
+              ? `<div class="text-sm text-gray-500 line-through-10">$${money(p.precioPublico)}</div>
+                 <div class="text-xl font-bold text-green-700">$${money(precioMostrar)}</div>
+                 <div class="text-xs text-green-700">Precio a costo</div>`
+              : `<div class="text-xl font-bold text-gray-900">$${money(precioMostrar)}</div>
+                 <div class="text-xs text-gray-500">Precio público</div>`}
+          </div>
+        </div>`;
+
+      // Card contenedor
+      const card = document.createElement('div');
+      card.className = "relative bg-white rounded-xl shadow-sm card overflow-hidden flex flex-col";
+
+      // Enlace sobre toda la tarjeta -> SIEMPRE al dummy
+      const stretched = document.createElement('a');
+      stretched.href = `producto.html?slug=${encodeURIComponent('paracetamol-500mg-20-comp-gen')}`;
+      stretched.className = "absolute inset-0";
+      stretched.setAttribute('aria-label', `Ver detalle de ${p.nombre}`);
+
+      // Contenido visible
+      const content = document.createElement('div');
+      content.innerHTML = upperBlock;
+
+      // Acciones (botón con z-index para no navegar)
+      const actions = document.createElement('div');
+      actions.className = "px-4 pb-4 pt-0 mt-auto relative z-10";
+      actions.innerHTML = `
+        <button ${puedeCosto ? '' : 'disabled'}
+          class="w-full ${puedeCosto ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-300 cursor-not-allowed'}
+                 text-white font-semibold py-2 rounded-lg add-btn">
+          <i class="fas fa-cart-plus mr-2"></i> Añadir al carrito
+        </button>
+        ${puedeCosto ? '' : '<p class="text-xs text-gray-500 mt-2">Suscríbete para comprar a costo.</p>'}
+      `;
+
+      // Montaje
+      card.appendChild(content.firstChild);
+      card.appendChild(content.lastChild);
+      card.appendChild(actions);
+      card.appendChild(stretched);
+      grid.appendChild(card);
+    });
+  }
+
+  // -----------------------------
+  // Init
+  // -----------------------------
+  cargarEstado().then(render);
+
+  // Buscador (mock)
+  const inputQ = document.getElementById('q');
+  const inputQM = document.getElementById('qMobile');
+  [inputQ, inputQM].forEach(inp=>{
+    if(!inp) return;
+    inp.addEventListener('input', e=>{
+      const v = (e.target.value || "").toLowerCase();
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+      (v ? productos.filter(p => (p.nombre||'').toLowerCase().includes(v)) : productos)
+        .forEach(() => {});
+      if(!v){ render(); }
+    });
+  });
+
+  // Add to cart (mock) — impedir navegación del enlace
+  document.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.add-btn');
+    if(!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const count = document.getElementById('cartCount');
+    count.textContent = String(Number(count.textContent)+1);
+  });
+</script>
+
+</body>
+</html>

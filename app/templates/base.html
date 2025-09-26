@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es" class="h-full bg-gray-50">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>{% block title %}FarmActiva{% endblock %}</title>
+
+  <link rel="icon" type="image/png" href="/static/images/logo/favicon.png" />
+
+  <!-- Tailwind (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+  <!-- Estilos compartidos (dropdown, tarjetas, etc.) -->
+  <style>
+    .card{transition:transform .2s, box-shadow .2s}
+    .card:hover{transform:translateY(-4px); box-shadow:0 12px 22px rgba(0,0,0,.08)}
+    .badge{font-size:.75rem}
+    .price-list{font-variant-numeric: tabular-nums}
+    .line-through-10{position:relative}
+    .line-through-10::after{content:"";position:absolute;left:0;right:0;top:55%;height:2px;background:#ef4444;transform:rotate(-8deg)}
+    .nav-link{position:relative}
+    .nav-link>.dropdown{display:none; position:absolute; left:0; top:100%; min-width:14rem; z-index:50}
+    .nav-link:hover>.dropdown{display:block}
+  </style>
+
+  {% block head_extra %}{% endblock %}
+</head>
+<body class="min-h-full flex flex-col">
+
+  {% include "_header.html" %}
+
+  <main class="flex-1">
+    {% block content %}{% endblock %}
+  </main>
+
+  {% include "_footer.html" %}
+
+  <!-- Script compartido: contador de carrito en el header -->
+  <script>
+    // Offcanvas
+    const mm = document.getElementById('mobileMenu');
+    const openBtn = document.getElementById('btnMenu');
+    const closeBtn = document.getElementById('btnCloseMenu');
+    const shade = document.getElementById('closeMenu');
+
+    function openMenu(){ mm.classList.remove('hidden'); document.body.classList.add('overflow-hidden'); }
+    function closeMenu(){ mm.classList.add('hidden'); document.body.classList.remove('overflow-hidden'); }
+
+    if(openBtn) openBtn.addEventListener('click', openMenu);
+    if(closeBtn) closeBtn.addEventListener('click', closeMenu);
+    if(shade) shade.addEventListener('click', closeMenu);
+    document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeMenu(); });
+
+    // Acordeones
+    document.querySelectorAll('[data-acc]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const panel = btn.nextElementSibling;
+        panel.classList.toggle('hidden');
+        btn.querySelector('i').classList.toggle('rotate-180');
+      });
+    });
+
+    // Accesibilidad básica dropdown desktop (abrir con teclado)
+    document.querySelectorAll('nav ul > li.group > button').forEach(btn=>{
+      btn.addEventListener('keydown', (e)=>{
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          // forzamos focus al primer link del dropdown
+          const drop = btn.parentElement.querySelector('.absolute');
+          drop?.classList.remove('hidden');
+          drop?.querySelector('a')?.focus();
+        }
+      });
+    });
+  </script>
+
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>
+

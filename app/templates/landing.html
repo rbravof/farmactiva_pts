@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Por tu Salud - FarmActiva | Medicamentos a Precio de Costo</title>
+	<link rel="icon" type="image/png" href="/static/imgenes/favicon.png">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+	<style>*{font-family:'Inter',sans-serif;}.hero-gradient{background:linear-gradient(135deg,#1B365D 0%,#2563eb 100%);}.card-hover{transition:all 0.3s ease;}.card-hover:hover{transform:translateY(-5px);box-shadow:0 20px 25px -5px rgba(0,0,0,0.1),0 10px 10px -5px rgba(0,0,0,0.04);}.btn-primary{background:linear-gradient(135deg,#28A745 0%,#20c997 100%);transition:all 0.3s ease;}.btn-primary:hover{transform:translateY(-2px);box-shadow:0 10px 15px -3px rgba(40,167,69,0.3);}.btn-secondary{background:linear-gradient(135deg,#1B365D 0%,#2563eb 100%);transition:all 0.3s ease;}.btn-secondary:hover{transform:translateY(-2px);box-shadow:0 10px 15px -3px rgba(27,54,93,0.3);}.price-highlight{position:relative;}.price-highlight::before{content:'';position:absolute;top:50%;left:0;right:0;height:2px;background:#ef4444;transform:rotate(-15deg);}.savings-card{background:linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%);border:2px solid #28A745;}@keyframes fadeInUp{from{opacity:0;transform:translateY(30px);}to{opacity:1;transform:translateY(0);}}.fade-in-up{animation:fadeInUp 0.6s ease-out;}.medicine-icon{background:linear-gradient(135deg,#e0f2fe 0%,#b3e5fc 100%);}</style>
+</head>
+<body class="bg-gray-50">
+    <!-- Hero Section -->
+    <section class="hero-gradient text-white relative overflow-hidden">
+        <div class="absolute inset-0 opacity-10">
+            <div class="absolute top-20 left-20 w-40 h-40 bg-white rounded-full opacity-20"></div>
+            <div class="absolute bottom-20 right-20 w-60 h-60 bg-green-400 rounded-full opacity-20"></div>
+            <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-blue-300 rounded-full opacity-10"></div>
+        </div>
+        
+        <div class="container mx-auto px-4 py-16 relative z-10">
+            <div class="flex flex-col lg:flex-row items-center justify-between">
+                <div class="lg:w-1/2 mb-12 lg:mb-0 fade-in-up">
+					<div class="mb-6 text-center">
+						<img src="/static/Images/logo/logo.png" alt="GoFarma" class="mb-4" style="max-width: 250px; height: auto;">
+					</div>
+                    <h1 class="text-4xl lg:text-6xl font-bold mb-6 leading-tight">
+                        Accede a tus medicamentos con <span class="text-green-400">precios justos</span>
+                    </h1>
+                    <p class="text-xl lg:text-2xl mb-8 text-blue-100">
+                        Afíliate al beneficio "Por tu Salud" y compra todo a precio de costo
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-4">
+                    <a href="/tipo_contrato.html" class="btn-primary text-white px-8 py-4 rounded-lg font-semibold text-lg flex items-center justify-center">
+                        <i class="fas fa-check-circle mr-2"></i>
+                        Contratar Ahora
+                    </a>
+                    <a href="/login?next=/tienda" class="btn-secondary text-white px-8 py-4 rounded-lg font-semibold text-lg flex items-center justify-center">
+                        <i class="fas fa-shopping-cart mr-2"></i>
+                        Tienda Online
+                    </a>
+                    </div>
+
+                    <div class="mt-8 bg-white bg-opacity-20 rounded-lg p-4">
+                        <p class="text-lg font-medium">
+                            <i class="fas fa-star text-yellow-400 mr-2"></i>
+                            Solo <span class="text-2xl font-bold text-green-400">$8.990</span> mensuales
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="lg:w-1/2 flex justify-center">
+                    <div class="relative">
+                        <div class="w-80 h-80 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                            <div class="w-60 h-60 bg-white bg-opacity-30 rounded-full flex items-center justify-center">
+                                <div class="text-8xl text-white opacity-80">
+                                    <i class="fas fa-pills"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="absolute -top-4 -right-4 bg-green-500 text-white p-3 rounded-full">
+                            <i class="fas fa-heart text-2xl"></i>
+                        </div>
+                        <div class="absolute -bottom-4 -left-4 bg-blue-500 text-white p-3 rounded-full">
+                            <i class="fas fa-shield-alt text-2xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Beneficios Section -->
+    <section class="py-16 bg-white">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl lg:text-4xl font-bold text-gray-800 mb-4">
+                    ¿Por qué elegir <span class="text-green-600">Por tu Salud</span>?
+                </h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Un programa único en Chile que revoluciona tu acceso a medicamentos
+                </p>
+            </div>
+            
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="card-hover bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+                    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-6">
+                        <i class="fas fa-dollar-sign text-2xl text-green-600"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Precio de Costo</h3>
+                    <p class="text-gray-600">Accede a medicamentos al mismo precio que compra la farmacia. Sin márgenes adicionales.</p>
+                </div>
+                
+                <div class="card-hover bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+                    <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-6">
+                        <i class="fas fa-file-contract text-2xl text-blue-600"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Sin Letra Chica</h3>
+                    <p class="text-gray-600">Transparencia total. Lo que ves es lo que pagas, sin sorpresas ni condiciones ocultas.</p>
+                </div>
+                
+                <div class="card-hover bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+                    <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-6">
+                        <i class="fas fa-clock text-2xl text-purple-600"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Compra 24/7</h3>
+                    <p class="text-gray-600">Tienda online disponible las 24 horas. Compra cuando más te convenga.</p>
+                </div>
+                
+                <div class="card-hover bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+                    <div class="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-6">
+                        <i class="fas fa-truck text-2xl text-orange-600"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Envío a Domicilio</h3>
+                    <p class="text-gray-600">Recibe tus medicamentos directamente en tu hogar de forma segura y rápida.</p>
+                </div>
+                
+                <div class="card-hover bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+                    <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6">
+                        <i class="fas fa-times-circle text-2xl text-red-600"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Sin Amarre</h3>
+                    <p class="text-gray-600">Cancela cuando quieras sin penalizaciones. Tu libertad es importante para nosotros.</p>
+                </div>
+                
+                <div class="card-hover bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+                    <div class="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mb-6">
+                        <i class="fas fa-headset text-2xl text-teal-600"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Soporte Experto</h3>
+                    <p class="text-gray-600">Atención personalizada con farmacéuticos profesionales para resolver tus dudas.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Comparativa de Precios -->
+    <section class="py-16 bg-gray-50">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl lg:text-4xl font-bold text-gray-800 mb-4">
+                    Compara y <span class="text-green-600">Ahorra</span>
+                </h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Mira cuánto puedes ahorrar con nuestros precios reales
+                </p>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full max-w-4xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+                    <thead>
+                        <tr class="bg-gray-800 text-white">
+                            <th class="px-6 py-4 text-left">Medicamento</th>
+                            <th class="px-6 py-4 text-center">Farmacia Tradicional</th>
+                            <th class="px-6 py-4 text-center">Con Por tu Salud</th>
+                            <th class="px-6 py-4 text-center">Ahorro</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-gray-200 hover:bg-gray-50">
+                            <td class="px-6 py-4">
+                                <div class="flex items-center">
+                                    <div class="w-10 h-10 medicine-icon rounded-full flex items-center justify-center mr-3">
+                                        <i class="fas fa-pills text-blue-600"></i>
+                                    </div>
+                                    <div>
+                                        <div class="font-semibold">Ibuprofeno 600mg</div>
+                                        <div class="text-sm text-gray-600">Caja x 20 comprimidos</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="price-highlight text-lg font-bold text-red-600">$4.500</span>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="text-lg font-bold text-green-600">$2.200</span>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full font-semibold">$2.300</span>
+                            </td>
+                        </tr>
+                        <tr class="border-b border-gray-200 hover:bg-gray-50">
+                            <td class="px-6 py-4">
+                                <div class="flex items-center">
+                                    <div class="w-10 h-10 medicine-icon rounded-full flex items-center justify-center mr-3">
+                                        <i class="fas fa-capsules text-blue-600"></i>
+                                    </div>
+                                    <div>
+                                        <div class="font-semibold">Omeprazol 20mg</div>
+                                        <div class="text-sm text-gray-600">Caja x 14 cápsulas</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="price-highlight text-lg font-bold text-red-600">$8.900</span>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="text-lg font-bold text-green-600">$4.100</span>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full font-semibold">$4.800</span>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4">
+                                <div class="flex items-center">
+                                    <div class="w-10 h-10 medicine-icon rounded-full flex items-center justify-center mr-3">
+                                        <i class="fas fa-tablets text-blue-600"></i>
+                                    </div>
+                                    <div>
+                                        <div class="font-semibold">Losartán 50mg</div>
+                                        <div class="text-sm text-gray-600">Caja x 30 comprimidos</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="price-highlight text-lg font-bold text-red-600">$12.500</span>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="text-lg font-bold text-green-600">$6.800</span>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full font-semibold">$5.700</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="text-center mt-8">
+                <p class="text-lg text-gray-600 mb-4">*Precios referenciales. Los precios pueden variar según disponibilidad y proveedor.</p>
+                <button class="btn-primary text-white px-8 py-3 rounded-lg font-semibold">
+                    Ver Más Productos
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Simulador de Ahorro -->
+    <section class="py-16 bg-white">
+        <div class="container mx-auto px-4">
+            <div class="max-w-2xl mx-auto text-center">
+                <h2 class="text-3xl lg:text-4xl font-bold text-gray-800 mb-4">
+                    Calcula tu <span class="text-green-600">Ahorro</span>
+                </h2>
+                <p class="text-xl text-gray-600 mb-8">
+                    Descubre cuánto podrías ahorrar cada mes con nuestro programa
+                </p>
+                
+                <div class="bg-gray-50 rounded-2xl p-8 mb-8">
+                    <div class="mb-6">
+                        <label class="block text-lg font-semibold text-gray-700 mb-3">
+                            ¿Cuánto gastas en medicamentos al mes?
+                        </label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 text-xl">$</span>
+                            <input 
+                                type="number" 
+                                id="monthlySpending" 
+                                class="w-full pl-8 pr-4 py-4 text-xl border-2 border-gray-200 rounded-lg focus:border-green-500 focus:outline-none"
+                                placeholder="Ej: 50000"
+                                min="0"
+                                oninput="calculateSavings()"
+                            >
+                        </div>
+                    </div>
+                    
+                    <div id="savingsResult" class="hidden">
+                        <div class="savings-card rounded-xl p-6 mb-4">
+                            <div class="flex items-center justify-center mb-4">
+                                <i class="fas fa-piggy-bank text-3xl text-green-600 mr-3"></i>
+                                <h3 class="text-2xl font-bold text-green-800">Tu Ahorro Estimado</h3>
+                            </div>
+                            <div class="grid md:grid-cols-3 gap-4 text-center">
+                                <div>
+                                    <div class="text-3xl font-bold text-green-600" id="monthlySavings">$0</div>
+                                    <div class="text-sm text-green-700">Ahorro mensual</div>
+                                </div>
+                                <div>
+                                    <div class="text-3xl font-bold text-green-600" id="yearlySavings">$0</div>
+                                    <div class="text-sm text-green-700">Ahorro anual</div>
+                                </div>
+                                <div>
+                                    <div class="text-3xl font-bold text-green-600" id="netSavings">$0</div>
+                                    <div class="text-sm text-green-700">Ahorro neto mensual</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                            <p class="text-blue-800">
+                                <i class="fas fa-info-circle mr-2"></i>
+                                <strong>¡Increíble!</strong> Con solo $8.990 mensuales, podrías ahorrar significativamente en tus medicamentos.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <button class="btn-primary text-white px-8 py-4 rounded-lg font-semibold text-lg w-full">
+                        <i class="fas fa-rocket mr-2"></i>
+                        ¡Quiero Comenzar a Ahorrar!
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Sección Empresas -->
+    <section class="py-16 bg-gradient-to-r from-blue-900 to-blue-800 text-white">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col lg:flex-row items-center justify-between">
+                <div class="lg:w-2/3 mb-8 lg:mb-0">
+                    <h2 class="text-3xl lg:text-4xl font-bold mb-4">
+                        Beneficio Corporativo para tus <span class="text-green-400">Trabajadores</span>
+                    </h2>
+                    <p class="text-xl text-blue-100 mb-6">
+                        Ofrece a tu equipo acceso a medicamentos a precio de costo como beneficio corporativo. 
+                        Mejora su bienestar y demuestra que te importa su salud.
+                    </p>
+                    <div class="grid md:grid-cols-2 gap-4 mb-6">
+                        <div class="flex items-center">
+                            <i class="fas fa-check-circle text-green-400 mr-3"></i>
+                            <span>Implementación sin costo</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-check-circle text-green-400 mr-3"></i>
+                            <span>Gestión administrativa incluida</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-check-circle text-green-400 mr-3"></i>
+                            <span>Reportes de uso y satisfacción</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-check-circle text-green-400 mr-3"></i>
+                            <span>Soporte dedicado para RRHH</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="lg:w-1/3">
+                    <div class="bg-white bg-opacity-10 backdrop-blur-sm rounded-2xl p-8 text-center">
+                        <div class="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <i class="fas fa-building text-3xl text-white"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold mb-4">Solicita Información</h3>
+                        <p class="text-blue-100 mb-6">Conoce cómo implementar este beneficio en tu empresa</p>
+                        <button class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-semibold w-full transition-colors">
+                            <i class="fas fa-envelope mr-2"></i>
+                            Contactar Empresas
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-12">
+        <div class="container mx-auto px-4">
+            <div class="grid md:grid-cols-4 gap-8">
+                <div class="md:col-span-2">
+					<div class="mb-6 text-center">
+						<img src="/static/Images/logo/logo.png" alt="GoFarma" class="mb-4" style="max-width: 250px; height: auto;">
+					</div>
+                    <p class="text-gray-300 mb-4 max-w-md">
+                        Revolucionando el acceso a medicamentos en Chile con precios justos y transparentes. 
+                        Tu salud es nuestra prioridad.
+                    </p>
+                    <div class="flex space-x-4">
+                        <a href="#" class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors">
+                            <i class="fab fa-facebook-f"></i>
+                        </a>
+                        <a href="#" class="w-10 h-10 bg-blue-400 rounded-full flex items-center justify-center hover:bg-blue-500 transition-colors">
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                        <a href="#" class="w-10 h-10 bg-pink-600 rounded-full flex items-center justify-center hover:bg-pink-700 transition-colors">
+                            <i class="fab fa-instagram"></i>
+                        </a>
+                        <a href="#" class="w-10 h-10 bg-blue-700 rounded-full flex items-center justify-center hover:bg-blue-800 transition-colors">
+                            <i class="fab fa-linkedin-in"></i>
+                        </a>
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">Enlaces Rápidos</h3>
+                    <ul class="space-y-2">
+                        <li><a href="#" class="text-gray-300 hover:text-white transition-colors">Cómo Funciona</a></li>
+                        <li><a href="#" class="text-gray-300 hover:text-white transition-colors">Precios</a></li>
+                        <li><a href="#" class="text-gray-300 hover:text-white transition-colors">Catálogo</a></li>
+                        <li><a href="#" class="text-gray-300 hover:text-white transition-colors">Preguntas Frecuentes</a></li>
+                        <li><a href="#" class="text-gray-300 hover:text-white transition-colors">Sucursales</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">Contacto</h3>
+                    <div class="space-y-3">
+                        <div class="flex items-center">
+                            <i class="fas fa-envelope text-green-400 mr-3"></i>
+                            <a href="mailto:hola@farmactiva.cl" class="text-gray-300 hover:text-white transition-colors">
+                                hola@farmactiva.cl
+                            </a>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fab fa-whatsapp text-green-400 mr-3"></i>
+                            <a href="https://wa.me/56912345678" class="text-gray-300 hover:text-white transition-colors">
+                                +56 9 1234 5678
+                            </a>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-phone text-green-400 mr-3"></i>
+                            <span class="text-gray-300">800 123 456</span>
+                        </div>
+                        <div class="flex items-start">
+                            <i class="fas fa-map-marker-alt text-green-400 mr-3 mt-1"></i>
+                            <span class="text-gray-300">Av. Providencia 1234, Santiago, Chile</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-800 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center">
+                <div class="text-gray-400 text-sm mb-4 md:mb-0">
+                    © 2024 FarmActiva. Todos los derechos reservados.
+                </div>
+                <div class="flex space-x-6 text-sm">
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors">Términos y Condiciones</a>
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors">Política de Privacidad</a>
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors">Contacto</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- WhatsApp Floating Button -->
+    <div class="fixed bottom-6 right-6 z-50">
+        <a href="https://wa.me/56912345678" class="bg-green-500 hover:bg-green-600 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center">
+            <i class="fab fa-whatsapp text-2xl"></i>
+        </a>
+    </div>
+
+    <script>
+        function calculateSavings() {
+            const monthlySpending = parseFloat(document.getElementById('monthlySpending').value) || 0;
+            const membershipFee = 8990;
+            
+            if (monthlySpending > 0) {
+                // Estimamos un ahorro promedio del 45% en medicamentos
+                const savingsPercentage = 0.45;
+                const monthlySavingsAmount = monthlySpending * savingsPercentage;
+                const yearlySavingsAmount = monthlySavingsAmount * 12;
+                const netMonthlySavings = monthlySavingsAmount - membershipFee;
+                
+                // Mostrar resultados
+                document.getElementById('savingsResult').classList.remove('hidden');
+                document.getElementById('monthlySavings').textContent = '$' + Math.round(monthlySavingsAmount).toLocaleString('es-CL');
+                document.getElementById('yearlySavings').textContent = '$' + Math.round(yearlySavingsAmount).toLocaleString('es-CL');
+                
+                if (netMonthlySavings > 0) {
+                    document.getElementById('netSavings').textContent = '$' + Math.round(netMonthlySavings).toLocaleString('es-CL');
+                    document.getElementById('netSavings').className = 'text-3xl font-bold text-green-600';
+                } else {
+                    document.getElementById('netSavings').textContent = '$' + Math.round(Math.abs(netMonthlySavings)).toLocaleString('es-CL');
+                    document.getElementById('netSavings').className = 'text-3xl font-bold text-red-600';
+                }
+            } else {
+                document.getElementById('savingsResult').classList.add('hidden');
+            }
+        }
+
+        // Smooth scrolling para los enlaces internos
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Animación de aparición cuando los elementos entran en el viewport
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('fade-in-up');
+                }
+            });
+        }, observerOptions);
+
+        // Observar todos los elementos que queremos animar
+        document.querySelectorAll('.card-hover, .table, .savings-card').forEach((el) => {
+            observer.observe(el);
+        });
+		
+		document.querySelector('.btn-primary').addEventListener('click', () => {
+		  window.location.href = "/tipo_contrato.html";
+	    });
+    </script>
+</body>
+</html>

@@ -1,0 +1,455 @@
+{% extends "base.html" %}
+{% block content %}
+<!-- Resultados de Búsqueda -->
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+  <!-- Título + resumen -->
+  <div class="mb-6">
+    <h1 class="text-2xl font-semibold text-gray-900">Resultados</h1>
+    <p id="searchSummary" class="text-sm text-gray-500 mt-1">Buscando…</p>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+
+    <!-- SIDEBAR FILTROS -->
+    <aside class="md:col-span-3">
+      <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-base font-semibold text-gray-800 flex items-center gap-2">
+            <i class="fas fa-filter"></i> Filtros
+          </h2>
+          <button id="btnLimpiarFiltros" class="text-xs text-teal-700 hover:underline">Limpiar</button>
+        </div>
+
+        <!-- Laboratorio -->
+        <div class="mt-4">
+          <div class="text-sm font-medium text-gray-700 mb-2">Laboratorio</div>
+          <div id="filtroLabs" class="space-y-2 max-h-48 overflow-auto pr-1">
+            <!-- checkboxes dinámicos -->
+          </div>
+        </div>
+
+        <!-- Tipo -->
+        <div class="mt-5">
+          <div class="text-sm font-medium text-gray-700 mb-2">Tipo</div>
+          <div id="filtroTipos" class="space-y-2">
+            <!-- checkboxes dinámicos -->
+          </div>
+        </div>
+
+        <!-- Precio -->
+        <div class="mt-5">
+          <div class="text-sm font-medium text-gray-700 mb-2">Precio suscripción (CLP)</div>
+          <div class="flex items-center gap-2">
+            <input id="precioMin" type="number" class="w-1/2 border rounded-lg px-3 py-2 text-sm" placeholder="Mín">
+            <input id="precioMax" type="number" class="w-1/2 border rounded-lg px-3 py-2 text-sm" placeholder="Máx">
+          </div>
+          <div class="flex items-center gap-2 mt-2">
+            <button id="btnAplicarPrecio" class="px-3 py-1.5 text-xs rounded-lg bg-gray-800 text-white hover:bg-gray-900">Aplicar</button>
+            <span id="precioHint" class="text-xs text-gray-500"></span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- LISTADO / CONTROLES -->
+    <main class="md:col-span-9">
+      <!-- Barra de controles -->
+      <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-3 mb-4">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div class="text-sm text-gray-600">
+            <span id="contadorResultados" class="font-semibold">0</span> productos encontrados
+          </div>
+          <div class="flex items-center gap-3">
+            <label class="text-sm text-gray-600">Orden:
+              <select id="ordenSelect" class="border rounded-lg px-2 py-1 text-sm ml-2">
+                <option value="az">A-Z</option>
+                <option value="za">Z-A</option>
+              </select>
+            </label>
+            <label class="text-sm text-gray-600">Mostrar:
+              <select id="pageSizeSelect" class="border rounded-lg px-2 py-1 text-sm ml-2">
+                <option value="12" selected>12</option>
+                <option value="24">24</option>
+                <option value="36">36</option>
+              </select>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Grid de tarjetas -->
+      <div id="gridProductos" class="grid grid-cols-2 lg:grid-cols-4 gap-6"></div>
+
+      <!-- Ver más -->
+      <div class="mt-6 flex justify-center">
+        <button id="btnVerMas" class="px-5 py-2 text-sm rounded-lg bg-teal-600 hover:bg-teal-700 text-white shadow-sm">Ver más</button>
+      </div>
+
+      <!-- Vacío -->
+      <div id="emptyState" class="hidden mt-8 text-center text-gray-500">
+        <i class="far fa-frown text-3xl mb-2"></i>
+        <p>No se encontraron resultados con los filtros actuales.</p>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- =======================  JS  ======================= -->
+<script>
+// ================== CONFIG & UTILIDADES ==================
+const IMG_DEFAULT = "/static/images/productos/Kitadol_(B)_Paracetamol_500_mg_24_Comprimidos.jpg";
+const CART_KEY = "fa_cart";
+let suscripcionActiva = false; // se actualizará con /api/suscripcion/estado
+
+const $ = (sel, root=document) => root.querySelector(sel);
+const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+const CLP = new Intl.NumberFormat('es-CL', { maximumFractionDigits: 0 });
+
+function formatCLP(n) { try { return "$" + CLP.format(Number(n||0)); } catch { return "$"+n; } }
+
+function getParam(name) {
+  const url = new URL(window.location.href);
+  return url.searchParams.get(name) || "";
+}
+
+// ============== CARRITO (localStorage) ==============
+function getCart() {
+  try { return JSON.parse(localStorage.getItem(CART_KEY)) || []; } catch { return []; }
+}
+function saveCart(cart) {
+  localStorage.setItem(CART_KEY, JSON.stringify(cart));
+  updateCartCount();
+}
+function updateCartCount() {
+  const cart = getCart();
+  const count = cart.reduce((acc, it) => acc + (it.qty || 1), 0);
+  const elA = document.getElementById("cartCount");     // posible id en _header.html
+  const elB = document.getElementById("cart-count");    // variante común
+  if (elA) elA.textContent = String(count);
+  if (elB) elB.textContent = String(count);
+}
+function addToCart(p) {
+  if (!suscripcionActiva) {
+    alert("Para comprar a costo debes activar tu suscripción. Ve a la página de Beneficios.");
+    window.location.href = "/beneficios";
+    return;
+  }
+  const cart = getCart();
+  const idx = cart.findIndex(i => i.slug === p.slug);
+  if (idx >= 0) { cart[idx].qty = (cart[idx].qty || 1) + 1; }
+  else {
+    cart.push({
+      slug: p.slug,
+      nombre: p.nombre,
+      precio: p.precioSuscripcion,
+      qty: 1,
+      imagen: p.imagen || IMG_DEFAULT,
+      laboratorio: p.laboratorio
+    });
+  }
+  saveCart(cart);
+}
+
+// ============== CATÁLOGO DUMMY =================
+function slugify(str) {
+  return (str || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+const CATALOGO = (() => {
+  const base = [
+    // nombre, lab, tipo, condicion, precioNormal, precioSuscripcion
+    ["Ibuprofeno 400 mg 20 comprimidos","ANDRÓMACO","Genérico","Venta directa",3990,2990],
+    ["Paracetamol 500 mg 24 comprimidos (B)","LABORATORIO CHILE","Bioequivalente","Venta directa",3290,2490],
+    ["Amoxicilina 500 mg 12 cápsulas","SIEGFRIED","Marca","Receta",10990,8290],
+    ["Loratadina 10 mg 10 tabletas","BAYER","Marca","Venta directa",6990,5290],
+    ["Omeprazol 20 mg 14 cápsulas (B)","PFIZER","Bioequivalente","Venta directa",7990,5990],
+    ["Atorvastatina 20 mg 30 comprimidos","PFIZER","Marca","Receta",15990,11990],
+    ["Losartán 50 mg 30 comprimidos (B)","GRÜNENTHAL","Bioequivalente","Receta",12990,9990],
+    ["Metformina 850 mg 30 comprimidos (B)","ABBOTT","Bioequivalente","Receta",9990,7490],
+    ["Enalapril 10 mg 30 comprimidos","RECALCINE","Genérico","Receta",8990,6490],
+    ["Cetirizina 10 mg 10 tabletas","MINTLAB","Genérico","Venta directa",5990,4490],
+    ["Diclofenaco 50 mg 20 comprimidos","ANDRÓMACO","Genérico","Venta directa",4990,3790],
+    ["Naproxeno 550 mg 10 cápsulas (B)","LABORATORIO CHILE","Bioequivalente","Venta directa",6490,4890],
+    ["Levotiroxina 50 mcg 28 comprimidos","PFIZER","Marca","Receta",10990,8490],
+    ["Salbutamol Inhalador 100 mcg","GLAXOSMITHKLINE","Marca","Receta",12990,9990],
+    ["Azitromicina 500 mg 3 comprimidos","SIEGFRIED","Genérico","Receta",10990,8490],
+    ["Clotrimazol crema 1% 20 g","ANDRÓMACO","Genérico","Venta directa",4990,3790],
+    ["Ketoconazol shampoo 2% 100 ml","MINTLAB","Genérico","Venta directa",7990,5990],
+    ["Vitamina C 1 g 20 efervescentes","BAYER","Marca","Venta directa",6990,5290],
+    ["Aspirina 100 mg 30 comprimidos","BAYER","Marca","Venta directa",5990,4590],
+    ["Pantoprazol 40 mg 14 comprimidos (B)","ABBOTT","Bioequivalente","Receta",9990,7490],
+    ["Ibuprofeno 600 mg 10 cápsulas (B)","LABORATORIO CHILE","Bioequivalente","Venta directa",4490,3390],
+    ["Paracetamol 1 g 10 comprimidos","RECALCINE","Genérico","Venta directa",3990,2990],
+    ["Losartán 100 mg 30 comprimidos","GRÜNENTHAL","Genérico","Receta",13990,10690],
+    ["Omeprazol 20 mg 28 cápsulas","PFIZER","Marca","Venta directa",12990,9990],
+    ["Metformina 500 mg 60 comprimidos (B)","ABBOTT","Bioequivalente","Receta",12990,9990],
+    ["Cetirizina Gotas 10 ml","MINTLAB","Genérico","Venta directa",6990,5290],
+    ["Clorfenamina 4 mg 20 tabletas","ANDRÓMACO","Genérico","Venta directa",3490,2590],
+    ["Amoxicilina 875 mg + Ácido Clavulánico 125 mg 14 comp","SIEGFRIED","Marca","Receta",18990,14990],
+    ["Ibuprofeno 200 mg 24 comprimidos","ANDRÓMACO","Genérico","Venta directa",2990,2290],
+    ["Omeprazol 40 mg 14 cápsulas (B)","PFIZER","Bioequivalente","Receta",10990,8490],
+  ].map((x) => ({
+    nombre: x[0],
+    laboratorio: x[1],
+    tipo: x[2],
+    condicion: x[3],
+    precioNormal: x[4],
+    precioSuscripcion: x[5],
+    imagen: IMG_DEFAULT,
+    slug: slugify(`${x[0]} ${x[1]}`)
+  }));
+  return base;
+})();
+
+// ============== ESTADO DE SUSCRIPCIÓN (mock endpoint) ==============
+async function cargarEstadoSuscripcion() {
+  try {
+    const res = await fetch("/api/suscripcion/estado", { credentials: "include" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    suscripcionActiva = !!data.activa;
+  } catch (e) {
+    console.warn("No se pudo obtener /api/suscripcion/estado. Asumiendo no activa.", e);
+    suscripcionActiva = false;
+  }
+}
+
+// ============== FILTRADO, ORDEN Y RENDER ==============
+let q = "";
+let showLimit = 12;
+let orden = "az";
+let seleccionLabs = new Set();
+let seleccionTipos = new Set();
+let precioMin = null;
+let precioMax = null;
+
+function aplicarBusqueda(arr) {
+  if (!q) return arr.slice();
+  const qn = q.trim().toLowerCase();
+  return arr.filter(p =>
+    p.nombre.toLowerCase().includes(qn) ||
+    p.laboratorio.toLowerCase().includes(qn) ||
+    p.tipo.toLowerCase().includes(qn)
+  );
+}
+
+function aplicarFiltros(arr) {
+  let out = arr.slice();
+
+  if (seleccionLabs.size > 0) {
+    out = out.filter(p => seleccionLabs.has(p.laboratorio));
+  }
+  if (seleccionTipos.size > 0) {
+    out = out.filter(p => seleccionTipos.has(p.tipo));
+  }
+  if (precioMin != null) {
+    out = out.filter(p => Number(p.precioSuscripcion) >= Number(precioMin));
+  }
+  if (precioMax != null) {
+    out = out.filter(p => Number(p.precioSuscripcion) <= Number(precioMax));
+  }
+  return out;
+}
+
+function aplicarOrden(arr) {
+  const s = arr.slice().sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+  return (orden === "az") ? s : s.reverse();
+}
+
+function renderSidebar(baseline) {
+  // baseline = resultados SOLO de búsqueda q (sin filtros aplicados)
+  const contLabs = $("#filtroLabs");
+  const contTipos = $("#filtroTipos");
+  contLabs.innerHTML = "";
+  contTipos.innerHTML = "";
+
+  const labsUnicos = [...new Set(baseline.map(p => p.laboratorio))].sort((a,b)=>a.localeCompare(b,'es'));
+  const tiposUnicos = [...new Set(baseline.map(p => p.tipo))].sort((a,b)=>a.localeCompare(b,'es'));
+
+  labsUnicos.forEach(lab => {
+    const id = "lab-" + slugify(lab);
+    const checked = seleccionLabs.has(lab) ? "checked" : "";
+    contLabs.insertAdjacentHTML("beforeend", `
+      <label for="${id}" class="flex items-center gap-2 text-sm text-gray-700">
+        <input id="${id}" type="checkbox" class="rounded border-gray-300"
+          data-role="lab" data-value="${lab}" ${checked}>
+        <span>${lab}</span>
+      </label>
+    `);
+  });
+
+  tiposUnicos.forEach(tp => {
+    const id = "tipo-" + slugify(tp);
+    const checked = seleccionTipos.has(tp) ? "checked" : "";
+    contTipos.insertAdjacentHTML("beforeend", `
+      <label for="${id}" class="flex items-center gap-2 text-sm text-gray-700">
+        <input id="${id}" type="checkbox" class="rounded border-gray-300"
+          data-role="tipo" data-value="${tp}" ${checked}>
+        <span>${tp}</span>
+      </label>
+    `);
+  });
+
+  // Rango de precios sugerido según baseline
+  if (baseline.length > 0) {
+    const minP = Math.min(...baseline.map(p => p.precioSuscripcion));
+    const maxP = Math.max(...baseline.map(p => p.precioSuscripcion));
+    $("#precioHint").textContent = `Sugerido: ${formatCLP(minP)} – ${formatCLP(maxP)}`;
+    if ($("#precioMin").value === "") $("#precioMin").placeholder = minP;
+    if ($("#precioMax").value === "") $("#precioMax").placeholder = maxP;
+  } else {
+    $("#precioHint").textContent = "";
+  }
+
+  // Eventos dinámicos
+  contLabs.addEventListener("change", e => {
+    const t = e.target;
+    if (t && t.matches('input[type="checkbox"][data-role="lab"]')) {
+      const val = t.getAttribute("data-value");
+      if (t.checked) seleccionLabs.add(val); else seleccionLabs.delete(val);
+      showLimit = Number($("#pageSizeSelect").value || 12);
+      actualizarUI();
+    }
+  });
+  contTipos.addEventListener("change", e => {
+    const t = e.target;
+    if (t && t.matches('input[type="checkbox"][data-role="tipo"]')) {
+      const val = t.getAttribute("data-value");
+      if (t.checked) seleccionTipos.add(val); else seleccionTipos.delete(val);
+      showLimit = Number($("#pageSizeSelect").value || 12);
+      actualizarUI();
+    }
+  });
+}
+
+function renderGrid(arr) {
+  const cont = $("#gridProductos");
+  cont.innerHTML = "";
+
+  const toShow = arr.slice(0, showLimit);
+  toShow.forEach(p => {
+    const btnDisabled = suscripcionActiva ? "" : "disabled";
+    const btnClasses = suscripcionActiva
+      ? "mt-3 w-full text-sm bg-teal-600 hover:bg-teal-700 text-white py-2 rounded-lg"
+      : "mt-3 w-full text-sm bg-gray-300 text-gray-600 py-2 rounded-lg cursor-not-allowed";
+
+    const btnText = suscripcionActiva ? "Añadir al carrito" : "Suscríbete para comprar a costo";
+
+    cont.insertAdjacentHTML("beforeend", `
+      <div class="group bg-white border border-gray-100 rounded-xl p-4 shadow-sm hover:shadow-md transition flex flex-col">
+        <a href="/producto.html?slug=${encodeURIComponent(p.slug)}" class="block">
+          <div class="w-full aspect-square bg-gray-50 rounded-lg overflow-hidden">
+            <img src="${p.imagen || IMG_DEFAULT}" alt="${p.nombre}" class="w-full h-full object-contain">
+          </div>
+        </a>
+        <div class="mt-3 text-xs text-gray-500 uppercase tracking-wide">${p.laboratorio}</div>
+        <a href="/producto.html?slug=${encodeURIComponent(p.slug)}" class="mt-1 text-sm font-medium text-gray-900 line-clamp-2 group-hover:text-teal-700">${p.nombre}</a>
+        <div class="text-xs text-gray-500">${p.condicion}</div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span class="text-sm text-gray-400 line-through">${formatCLP(p.precioNormal)}</span>
+          <span class="text-lg font-semibold text-teal-700">${formatCLP(p.precioSuscripcion)}</span>
+        </div>
+        <button class="${btnClasses}" data-role="add" data-slug="${p.slug}" ${btnDisabled}>
+          ${btnText}
+        </button>
+      </div>
+    `);
+  });
+
+  // Botones "Añadir al carrito"
+  cont.addEventListener("click", (e) => {
+    const btn = e.target.closest('button[data-role="add"]');
+    if (btn) {
+      const slug = btn.getAttribute("data-slug");
+      const prod = CATALOGO.find(x => x.slug === slug);
+      if (prod) addToCart(prod);
+    }
+  });
+
+  // Contadores y vacíos
+  $("#contadorResultados").textContent = arr.length;
+  $("#emptyState").classList.toggle("hidden", arr.length > 0);
+
+  // Ver más visible sólo si hay más que mostrar y límite < 36
+  const canShowMore = arr.length > toShow.length && showLimit < 36;
+  $("#btnVerMas").classList.toggle("hidden", !canShowMore);
+}
+
+function actualizarUI() {
+  // 1) aplicar búsqueda
+  const baseQ = aplicarBusqueda(CATALOGO);
+  // 2) sidebar se pinta con baseline de búsqueda (no depende de lab/tipo/precio)
+  renderSidebar(baseQ);
+  // 3) filtros + orden
+  const filtrados = aplicarOrden(aplicarFiltros(baseQ));
+  // 4) render grid
+  renderGrid(filtrados);
+
+  // resumen de búsqueda
+  const k = q ? `"${q}"` : "todos";
+  $("#searchSummary").textContent = `Mostrando resultados para ${k}.`;
+}
+
+// ============== INIT ==============
+document.addEventListener("DOMContentLoaded", async () => {
+  // Estado suscripción
+  await cargarEstadoSuscripcion();
+  updateCartCount();
+
+  // Leer q de URL
+  q = getParam("q") || "";
+  const inputQ = q.trim();
+
+  // UI: establecer select por defecto y handlers
+  $("#ordenSelect").addEventListener("change", (e) => {
+    orden = e.target.value;
+    showLimit = Number($("#pageSizeSelect").value || 12);
+    actualizarUI();
+  });
+  $("#pageSizeSelect").addEventListener("change", (e) => {
+    showLimit = Number(e.target.value || 12);
+    actualizarUI();
+  });
+  $("#btnVerMas").addEventListener("click", () => {
+    // incrementos 12 → 24 → 36
+    const current = showLimit;
+    if (current < 36) {
+      showLimit = Math.min(36, current + 12);
+      actualizarUI();
+    }
+  });
+
+  $("#btnAplicarPrecio").addEventListener("click", () => {
+    const vmin = $("#precioMin").value;
+    const vmax = $("#precioMax").value;
+    precioMin = vmin !== "" ? Number(vmin) : null;
+    precioMax = vmax !== "" ? Number(vmax) : null;
+    showLimit = Number($("#pageSizeSelect").value || 12);
+    actualizarUI();
+  });
+
+  $("#btnLimpiarFiltros").addEventListener("click", () => {
+    seleccionLabs.clear();
+    seleccionTipos.clear();
+    precioMin = null;
+    precioMax = null;
+    $("#precioMin").value = "";
+    $("#precioMax").value = "";
+    $("#ordenSelect").value = "az";
+    $("#pageSizeSelect").value = "12";
+    orden = "az";
+    showLimit = 12;
+    actualizarUI();
+  });
+
+  // Semilla y primer render
+  if (inputQ) {
+    $("#searchSummary").textContent = `Buscando "${inputQ}"…`;
+  }
+  actualizarUI();
+});
+</script>
+{% endblock %}

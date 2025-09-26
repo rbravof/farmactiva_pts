@@ -1,0 +1,418 @@
+{% extends "base.html" %}
+{% block title %}Inicio – FarmActiva{% endblock %}
+
+{% block content %}
+<section class="text-white"
+         style="background: radial-gradient(1200px 600px at 80% 10%, rgba(255,255,255,0.08), transparent 60%),
+                 linear-gradient(120deg, #0D3C8C 0%, #1F6FDE 60%, #2C87F0 100%);">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div class="grid lg:grid-cols-2 gap-10 items-start">
+      <div>
+        <h1 class="text-3xl md:text-4xl font-semibold leading-tight">Accede a compras claras y a precios justos</h1>
+        <p class="mt-3 text-white/90">Perfumería, dermocosmética y cuidado personal con una experiencia simple y confiable.</p>
+
+        <!-- Buscador + Autocomplete -->
+        <div class="mt-6 relative" id="homeSearchWrapper">
+          <form id="homeSearchForm" action="/resultados.html" method="GET" class="relative">
+            <div class="rounded-xl p-2 flex items-center gap-2 shadow-lg ring-1 ring-white/20 bg-white">
+              <i class="fas fa-search text-gray-400 pl-2"></i>
+              <input id="homeSearchInput" name="q" type="search" class="w-full px-3 py-2 rounded-lg text-gray-800 focus:outline-none"
+                     placeholder="Busca por marca, producto o categoría…" autocomplete="off"
+                     aria-autocomplete="list" aria-expanded="false" aria-controls="searchPanel">
+              <button class="px-4 py-2 rounded-lg text-white" style="background:#2AB27B">Buscar</button>
+            </div>
+          </form>
+
+          <div id="searchPanel" class="hidden absolute z-50 mt-2 w-full bg-white rounded-xl shadow-2xl ring-1 ring-black/5 overflow-hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-3">
+              <div class="p-4 border-b lg:border-b-0 lg:border-r border-gray-100">
+                <div>
+                  <div class="text-xs font-semibold text-gray-500 mb-2 uppercase">Sugerencias</div>
+                  <ul id="sugTerms" class="space-y-1"></ul>
+                </div>
+                <a id="verTodoLink" href="#" class="block mt-4 text-sm" style="color:#0D3C8C">Ver todo en “<span id="verTodoQ"></span>”</a>
+              </div>
+              <div class="lg:col-span-2 p-4">
+                <div class="text-xs font-semibold text-gray-500 mb-2 uppercase">Productos sugeridos</div>
+                <div id="sugProducts" class="max-h-80 overflow-auto divide-y divide-gray-100"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Beneficios (igual) -->
+        <div class="mt-6 flex flex-wrap gap-3">
+          <div class="flex items-center gap-3 bg-white/15 hover:bg-white/20 transition rounded-full pl-2 pr-3 py-2 ring-1 ring-white/20">
+            <span class="inline-flex w-8 h-8 items-center justify-center rounded-full bg-white/20">
+              <i class="fas fa-truck-fast text-white"></i>
+            </span>
+            <div class="text-xs leading-tight"><div class="font-semibold">Despacho cuidadoso</div><div class="text-white/80">Cobertura según zona</div></div>
+          </div>
+          <div class="flex items-center gap-3 bg-white/15 hover:bg-white/20 transition rounded-full pl-2 pr-3 py-2 ring-1 ring-white/20">
+            <span class="inline-flex w-8 h-8 items-center justify-center rounded-full bg-white/20">
+              <i class="fas fa-box-open text-white"></i>
+            </span>
+            <div class="text-xs leading-tight"><div class="font-semibold">Retiro rápido</div><div class="text-white/80">Sucursales habilitadas</div></div>
+          </div>
+          <div class="flex items-center gap-3 bg-white/15 hover:bg-white/20 transition rounded-full pl-2 pr-3 py-2 ring-1 ring-white/20">
+            <span class="inline-flex w-8 h-8 items-center justify-center rounded-full bg-white/20">
+              <i class="fas fa-leaf text-white"></i>
+            </span>
+            <div class="text-xs leading-tight"><div class="font-semibold">Dermocosmética</div><div class="text-white/80">Marcas especialistas</div></div>
+          </div>
+          <div class="flex items-center gap-3 bg-white/15 hover:bg-white/20 transition rounded-full pl-2 pr-3 py-2 ring-1 ring-white/20">
+            <span class="inline-flex w-8 h-8 items-center justify-center rounded-full bg-white/20">
+              <i class="fas fa-baby text-white"></i>
+            </span>
+            <div class="text-xs leading-tight"><div class="font-semibold">Cuidado bebé</div><div class="text-white/80">Fragancias y pañales</div></div>
+          </div>
+        </div>
+
+        <p class="text-xs mt-3 text-white/80">Tip: prueba “dermocosmética”, “perfumería”, “cuidado personal”, “bebé”, “bienestar” o “dispositivos médicos”.</p>
+      </div>
+
+      <!-- Panel derecho con Tabs -->
+      <div class="rounded-2xl border border-white/20 bg-white/10 backdrop-blur-sm p-4">
+        <div class="flex gap-2">
+          <button class="tab-btn px-3 py-2 rounded-lg text-sm font-medium bg-white/10 ring-1 ring-white/20" data-tab="promos">Promos</button>
+          <button class="tab-btn px-3 py-2 rounded-lg text-sm font-medium hover:bg-white/10" data-tab="marcas">Marcas</button>
+          <button class="tab-btn px-3 py-2 rounded-lg text-sm font-medium hover:bg-white/10" data-tab="como">¿Cómo funciona?</button>
+        </div>
+        <div class="mt-4 space-y-4">
+          <div class="tab-content" id="tab-promos">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <a href="/resultados.html?q=dermocosmética" class="block bg-white/90 text-gray-900 rounded-xl p-4 shadow-sm hover:shadow transition">
+                <div class="text-sm font-semibold" style="color:#0D3C8C">Dermocosmética</div>
+                <div class="text-xs text-gray-600">Skincare con hasta 20% OFF</div>
+              </a>
+              <a href="/resultados.html?q=perfumería" class="block bg-white/90 text-gray-900 rounded-xl p-4 shadow-sm hover:shadow transition">
+                <div class="text-sm font-semibold" style="color:#0D3C8C">Perfumería</div>
+                <div class="text-xs text-gray-600">Fragancias seleccionadas</div>
+              </a>
+              <a href="/resultados.html?q=cuidado personal" class="block bg-white/90 text-gray-900 rounded-xl p-4 shadow-sm hover:shadow transition">
+                <div class="text-sm font-semibold" style="color:#0D3C8C">Cuidado personal</div>
+                <div class="text-xs text-gray-600">Cabello, higiene y más</div>
+              </a>
+              <a href="/resultados.html?q=bebé" class="block bg-white/90 text-gray-900 rounded-xl p-4 shadow-sm hover:shadow transition">
+                <div class="text-sm font-semibold" style="color:#0D3C8C">Bebé</div>
+                <div class="text-xs text-gray-600">Pañales y cuidado</div>
+              </a>
+            </div>
+          </div>
+
+          <div class="tab-content hidden" id="tab-marcas">
+            <div id="chipsMarcas" class="flex flex-wrap gap-2"></div>
+          </div>
+
+          <div class="tab-content hidden" id="tab-como">
+            <ol class="list-decimal list-inside text-sm text-white/90 space-y-1">
+              <li>Explora categorías permitidas o busca tu producto.</li>
+              <li>Inicia sesión y activa tu suscripción para precios preferentes.</li>
+              <li>Añade al carrito y elige despacho o retiro.</li>
+            </ol>
+            <div class="mt-3">
+              <a href="/beneficios" class="inline-block px-4 py-2 rounded-lg text-white" style="background:#2AB27B">Conoce los beneficios</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="bg-white">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-semibold" style="color:#0D3C8C">Marcas y líneas</h2>
+    </div>
+    <div id="scrollerMarcas" class="flex gap-3 overflow-x-auto pb-2"></div>
+  </div>
+</section>
+
+<section class="bg-white">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-semibold" style="color:#0D3C8C">Destacados</h2>
+      <div class="text-sm text-gray-500">Precios de referencia</div>
+    </div>
+    <div id="gridHome" class="grid grid-cols-2 lg:grid-cols-4 gap-6"></div>
+  </div>
+</section>
+
+<section class="mt-10">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="rounded-2xl border border-gray-200 bg-white p-6 lg:p-8 flex flex-col lg:flex-row items-center justify-between gap-6 shadow-sm">
+      <div>
+        <div class="text-xl font-semibold" style="color:#0D3C8C">Conoce “Por tu Salud – Farmactiva”</div>
+        <p class="text-gray-700 mt-1">Beneficios y precios preferentes para tus compras de uso diario.</p>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <a href="/beneficios" class="px-4 py-2 rounded-lg text-white" style="background:#2AB27B">Ver beneficios</a>
+          <a href="/login" class="px-4 py-2 bg-white border border-gray-300 rounded-lg" style="color:#0D3C8C">Iniciar sesión</a>
+        </div>
+      </div>
+      <div class="text-center lg:text-right">
+        <div class="text-3xl font-bold" style="color:#0D3C8C">Planes desde $7.990/mes</div>
+        <div class="text-sm text-gray-600">Individual, Familia y Empresa</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="searchResultsSection" class="hidden mt-12 mb-10">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-semibold" style="color:#0D3C8C">Resultados</h2>
+    </div>
+    <div id="gridResultados" class="grid grid-cols-2 lg:grid-cols-4 gap-6"></div>
+    <div id="emptyResultados" class="hidden text-center text-gray-500 mt-6">
+      <i class="far fa-frown text-2xl"></i>
+      <p class="mt-2">No encontramos coincidencias para tu búsqueda.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const IMG_DEFAULT = "/static/images/productos/Kitadol_(B)_Paracetamol_500_mg_24_Comprimidos.jpg";
+const CART_KEY = "fa_cart";
+let suscripcionActiva = false;
+
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+const CLP = new Intl.NumberFormat('es-CL', { maximumFractionDigits: 0 });
+const formatCLP = n => "$" + CLP.format(Number(n||0));
+const PRIMARY_BLUE = "#0D3C8C";
+const ACCENT_GREEN = "#2AB27B";
+
+function getParam(name){ const u=new URL(window.location.href); return u.searchParams.get(name)||""; }
+function debounce(fn, w=160){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), w); }; }
+function highlight(text,q){ if(!q) return text; const re=new RegExp("("+q.replace(/[.*+?^${}()|[\\]\\\\]/g,"\\$&")+")","ig"); return text.replace(re,'<mark class="bg-emerald-100" style="color:'+PRIMARY_BLUE+'">$1</mark>'); }
+
+function getCart(){ try{ return JSON.parse(localStorage.getItem(CART_KEY))||[] }catch{ return [] } }
+function saveCart(c){ localStorage.setItem(CART_KEY, JSON.stringify(c)); updateCartCount(); }
+function updateCartCount(){ const c=getCart().reduce((a,i)=>a+(i.qty||1),0); const b=document.getElementById("cart-count"); if(b) b.textContent=String(c); }
+function addToCart(p){
+  if(!suscripcionActiva){ alert("Activa tu suscripción para acceder a precios preferentes. Te llevamos a Beneficios."); window.location.href="/beneficios"; return; }
+  const cart=getCart(); const i=cart.findIndex(x=>x.slug===p.slug);
+  if(i>=0) cart[i].qty=(cart[i].qty||1)+1; else cart.push({slug:p.slug,nombre:p.nombre,precio:p.precioSuscripcion,qty:1,imagen:IMG_DEFAULT,laboratorio:p.marca||"—"});
+  saveCart(cart);
+}
+
+async function cargarEstadoSuscripcion(){ try{ const r=await fetch("/api/suscripcion/estado",{credentials:"include"}); const d=await r.json(); suscripcionActiva=!!d.activa; }catch{ suscripcionActiva=false; } }
+
+// ===== API =====
+const API = {
+  buscar: "/api/tienda/buscar",
+  marcas: "/api/tienda/marcas",
+  destacados: "/api/tienda/destacados",
+};
+
+function mapItem(it){
+  const precio = Number(it?.precio_venta ?? 0);
+  const slug = encodeURIComponent(`cod-${it?.codigo ?? ""}`);
+  return {
+    slug,
+    nombre: it?.nombre ?? "",
+    marca: it?.laboratorio ?? "—",
+    categoria: "Farmacia",
+    precioNormal: precio ? Math.round(precio * 1.12) : null,
+    precioSuscripcion: precio || null,
+  };
+}
+
+async function apiBuscar(q, limit=24, offset=0, soloConStock=true){
+  const url = new URL(API.buscar, window.location.origin);
+  if ((q||"").trim().length) url.searchParams.set("q", q.trim());
+  url.searchParams.set("limit", String(limit));
+  url.searchParams.set("offset", String(offset));
+  url.searchParams.set("solo_con_stock", soloConStock ? "true" : "false");
+  const resp = await fetch(url, { headers: {Accept:"application/json"}, credentials:"include" });
+  if (resp.status === 401) { window.location.href = `/login?next=/tienda`; throw new Error("401"); }
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const data = await resp.json();
+  return { items: (data.items||[]).map(mapItem), total: Number(data.total||0) };
+}
+
+async function apiMarcas(){
+  const resp = await fetch(API.marcas, { credentials:"include" });
+  if (resp.status === 401) { window.location.href = `/login?next=/tienda`; throw new Error("401"); }
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const { marcas=[] } = await resp.json();
+  return marcas;
+}
+
+async function apiDestacados(){
+  const resp = await fetch(API.destacados, { credentials:"include" });
+  if (resp.status === 401) { window.location.href = `/login?next=/tienda`; throw new Error("401"); }
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const { items=[] } = await resp.json();
+  return items.map(mapItem);
+}
+
+// ===== UI helpers =====
+function chipMarcaHTML(m){ return `<button type="button" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-full text-sm whitespace-nowrap">${m}</button>`; }
+function cardHTML(p){
+  const enabled=suscripcionActiva, btnClass=enabled?"text-white":"bg-gray-300 text-gray-600 cursor-not-allowed";
+  const btnStyle=enabled?`style="background:${ACCENT_GREEN}"`:""; const btnText=enabled?"Añadir al carrito":"Activa tu suscripción";
+  return `<div class="group bg-white border border-gray-100 rounded-xl p-4 shadow-sm hover:shadow-md transition flex flex-col">
+    <a href="/producto.html?slug=${encodeURIComponent(p.slug)}" class="block">
+      <div class="w-full aspect-square bg-gray-50 rounded-lg overflow-hidden">
+        <img src="${IMG_DEFAULT}" alt="${p.nombre}" class="w-full h-full object-contain">
+      </div>
+    </a>
+    <div class="mt-3 text-xs text-gray-500 uppercase tracking-wide">${p.marca||"—"}</div>
+    <a href="/producto.html?slug=${encodeURIComponent(p.slug)}" class="mt-1 text-sm font-medium text-gray-900 line-clamp-2 hover:underline">${p.nombre}</a>
+    <div class="text-xs text-gray-500">Farmacia</div>
+    <div class="mt-2 flex items-baseline gap-2"><span class="text-sm text-gray-400 line-through">${formatCLP(p.precioNormal)}</span><span class="text-lg font-semibold" style="color:${PRIMARY_BLUE}">${formatCLP(p.precioSuscripcion)}</span></div>
+    <button class="mt-3 w-full text-sm py-2 rounded-lg ${btnClass}" ${btnStyle} data-role="add" data-slug="${p.slug}" ${enabled?"":"disabled"}>${btnText}</button>
+  </div>`;
+}
+function productRowHTML(p,q){
+  const enabled=suscripcionActiva;
+  const btn=enabled?`<button class="px-3 py-1.5 text-xs rounded-md text-white" style="background:${ACCENT_GREEN}" data-role="add" data-slug="${p.slug}">Añadir</button>`:`<button class="px-3 py-1.5 text-xs rounded-md bg-gray-300 text-gray-600 cursor-not-allowed" disabled>Suscripción</button>`;
+  return `<div class="py-3 flex items-center gap-3">
+    <a href="/producto.html?slug=${encodeURIComponent(p.slug)}" class="block w-14 h-14 bg-gray-50 border border-gray-100 rounded-md overflow-hidden flex-shrink-0"><img src="${IMG_DEFAULT}" alt="${p.nombre}" class="w-full h-full object-contain"></a>
+    <div class="flex-1 min-w-0">
+      <div class="text-sm font-medium text-gray-900 leading-tight">${highlight(p.nombre,q)}</div>
+      <div class="text-xs text-gray-500">${p.marca||"—"} • Farmacia</div>
+      <div class="text-xs text-gray-500"><span class="line-through">${formatCLP(p.precioNormal)}</span> <span class="font-semibold" style="color:${PRIMARY_BLUE}">${formatCLP(p.precioSuscripcion)}</span></div>
+    </div>
+    <div class="flex-shrink-0">${btn}</div>
+  </div>`;
+}
+function linkItem(text,q,href){ return `<li><a href="${href}" class="block px-2 py-1 rounded hover:bg-gray-100 text-sm">${highlight(text,q)}</a></li>`; }
+
+// ===== Render secciones =====
+async function renderMarcas(){
+  try{
+    const marcas = await apiMarcas();
+    const c1=$("#chipsMarcas"), c2=$("#scrollerMarcas");
+    const html = marcas.slice(0,50).map(chipMarcaHTML).join("");
+    c1.innerHTML = html; c2.innerHTML = marcas.slice(0,30).map(chipMarcaHTML).join("");
+    [c1,c2].forEach(c=>{
+      c.addEventListener("click",e=>{
+        const b=e.target.closest("button"); if(!b) return;
+        mostrarResultados(b.textContent.trim());
+      });
+    });
+  }catch(e){ console.error("Marcas:", e); }
+}
+
+async function renderGridHome(){
+  try{
+    const items = await apiDestacados();
+    const c=$("#gridHome"); c.innerHTML="";
+    items.forEach(p=>c.insertAdjacentHTML("beforeend", cardHTML(p)));
+    c.addEventListener("click",e=>{
+      const b=e.target.closest('button[data-role="add"]'); if(!b) return;
+      const slug=b.getAttribute("data-slug"); const p=items.find(x=>x.slug===slug);
+      if(p) addToCart(p);
+    },{once:true});
+  }catch(e){ console.error("Destacados:", e); }
+}
+
+// ===== Búsqueda / Autocomplete =====
+async function filtrarCatalogo(q){
+  if(!(q||"").trim()) return [];
+  const { items } = await apiBuscar(q, 24, 0, true);
+  return items;
+}
+
+function renderResultados(arr){
+  const s=$("#searchResultsSection"), g=$("#gridResultados"), e=$("#emptyResultados");
+  if(!arr.length){ s.classList.remove("hidden"); g.innerHTML=""; e.classList.remove("hidden"); return; }
+  e.classList.add("hidden"); s.classList.remove("hidden"); g.innerHTML="";
+  arr.slice(0,24).forEach(p=>g.insertAdjacentHTML("beforeend",cardHTML(p)));
+  g.addEventListener("click",ev=>{
+    const b=ev.target.closest('button[data-role="add"]'); if(!b) return;
+    const slug=b.getAttribute("data-slug"); const p=arr.find(x=>x.slug===slug);
+    if(p) addToCart(p);
+  },{once:true});
+}
+
+async function mostrarResultados(q){
+  try{
+    const m = await filtrarCatalogo(q);
+    renderResultados(m);
+    const u=new URL(window.location.href);
+    if(q && q.length) u.searchParams.set("q", q); else u.searchParams.delete("q");
+    window.history.replaceState({}, "", u.toString());
+  }catch(e){ console.error("Buscar:", e); }
+}
+
+const search={ open(){ $("#searchPanel").classList.remove("hidden"); $("#homeSearchInput").setAttribute("aria-expanded","true"); }, close(){ $("#searchPanel").classList.add("hidden"); $("#homeSearchInput").setAttribute("aria-expanded","false"); this.activeIndex=-1; }, activeIndex:-1, items:[] };
+
+async function buildAutocomplete(q){
+  let prods=[];
+  try{
+    const { items } = await apiBuscar(q, 8, 0, true);
+    prods = items;
+  }catch(e){ console.error("[AUTOCOMPLETE]", e); }
+
+  // sugerencias simples (términos)
+  const terms = [q, `${q} mujer`, `${q} hombre`].filter(Boolean);
+  $("#sugTerms").innerHTML = terms.slice(0,5).map(t=>linkItem(t,q,`/resultados.html?q=${encodeURIComponent(t)}`)).join("");
+  $("#verTodoQ").textContent=q; $("#verTodoLink").setAttribute("href", `/resultados.html?q=${encodeURIComponent(q)}`);
+
+  const right=$("#sugProducts"); right.innerHTML=prods.map(p=>productRowHTML(p,q)).join("");
+  right.addEventListener("click",e=>{
+    const b=e.target.closest('button[data-role="add"]'); if(!b) return;
+    const slug=b.getAttribute("data-slug"); const p=prods.find(x=>x.slug===slug);
+    if(p) addToCart(p);
+  },{once:true});
+
+  const clickables=[...$$("#sugTerms a"), ...$$("#sugProducts button[data-role='add']"), $("#verTodoLink")].filter(Boolean);
+  search.items=clickables; search.activeIndex=clickables.length?0:-1; updateActiveItem();
+}
+
+function updateActiveItem(){ search.items.forEach((el,i)=>{ el.classList.toggle("ring-2", i===search.activeIndex); el.classList.toggle("ring-emerald-400", i===search.activeIndex); el.classList.toggle("rounded-md", i===search.activeIndex); }); }
+
+// Tabs
+function initTabs(){ const btns=$$(".tab-btn"); const panels={promos:$("#tab-promos"), marcas:$("#tab-marcas"), como:$("#tab-como")};
+  function activate(k){ Object.values(panels).forEach(el=>el.classList.add("hidden")); if(panels[k]) panels[k].classList.remove("hidden");
+    btns.forEach(b=>{ const on=b.dataset.tab===k; b.classList.toggle("bg-white/10",on); b.classList.toggle("ring-1",on); b.classList.toggle("ring-white/20",on); }); }
+  btns.forEach(b=>b.addEventListener("click",()=>activate(b.dataset.tab))); activate("promos");
+}
+
+// Init
+document.addEventListener("DOMContentLoaded", async () => {
+  await cargarEstadoSuscripcion();
+  updateCartCount();
+  await renderMarcas();
+  await renderGridHome();
+  initTabs();
+
+  const form=$("#homeSearchForm"), input=$("#homeSearchInput"), wrapper=$("#homeSearchWrapper");
+  const q0=getParam("q"); if(q0) await mostrarResultados(q0);
+
+  const onType=debounce(async ()=>{
+    const q=input.value.trim();
+    if(!q){ search.close(); return; }
+    await buildAutocomplete(q); search.open();
+  },160);
+
+  input.addEventListener("input", onType);
+  input.addEventListener("focus", async ()=>{ if(input.value.trim()){ await buildAutocomplete(input.value.trim()); search.open(); } });
+
+  input.addEventListener("keydown", (e)=>{
+    if($("#searchPanel").classList.contains("hidden")) return;
+    const n=search.items.length;
+    if(e.key==="ArrowDown"){ e.preventDefault(); if(n){ search.activeIndex=(search.activeIndex+1)%n; updateActiveItem(); } }
+    else if(e.key==="ArrowUp"){ e.preventDefault(); if(n){ search.activeIndex=(search.activeIndex-1+n)%n; updateActiveItem(); } }
+    else if(e.key==="Enter"){ if(search.activeIndex>=0 && search.items[search.activeIndex]){ e.preventDefault(); search.items[search.activeIndex].click(); } }
+    else if(e.key==="Escape"){ search.close(); }
+  });
+
+  document.addEventListener("click",(e)=>{ if(!wrapper.contains(e.target)) search.close(); });
+
+  form.addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const q=input.value||"";
+    search.close();
+    await mostrarResultados(q);
+    window.scrollTo({ top: wrapper.offsetTop + 120, behavior:"smooth" });
+  });
+});
+</script>
+{% endblock %}

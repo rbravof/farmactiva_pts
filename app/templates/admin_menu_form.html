@@ -1,0 +1,436 @@
+{% extends "base_admin.html" %}
+{% block title %}Constructor de Menú{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto p-6">
+  <a href="/admin" class="text-sm text-slate-600 hover:underline">Volver</a>
+  <div class="mt-2 flex items-center justify-between">
+    <h1 class="text-2xl font-semibold">Constructor de Menú</h1>
+
+    <div class="flex items-center gap-2">
+      <label class="text-sm text-slate-600">Menú</label>
+      <select id="menuSelect" class="border rounded-lg px-3 py-2">
+        <option value="header" {{ 'selected' if menu=='header' else '' }}>Header</option>
+        <option value="footer" {{ 'selected' if menu=='footer' else '' }}>Footer</option>
+      </select>
+
+      <button id="btnNew"
+        style="background:#16a34a;color:#fff;border:1px solid #16a34a;border-radius:0.5rem"
+        class="ml-2 px-3 py-2 text-sm rounded bg-green-600 hover:bg-green-700 text-white border border-green-600">
+        Nuevo ítem
+      </button>
+    </div>
+  </div>
+
+  <!-- Árbol -->
+  <div class="mt-4 bg-white border rounded-xl">
+    <div class="border-b px-4 py-2 text-sm text-slate-600 flex">
+      <div class="w-7/12">Ítem</div>
+      <div class="w-3/12">Destino</div>
+      <div class="w-2/12 text-right">Acciones</div>
+    </div>
+
+    <div id="tree" class="p-2"><!-- Render JS --></div>
+
+    <div id="emptyBox" class="p-6 text-slate-500 text-sm hidden">
+      Aún no hay ítems. Crea el primero con “Nuevo ítem”.
+    </div>
+  </div>
+
+  <!-- Barra fija inferior -->
+  <div id="stickyBar" class="fixed inset-x-0 bottom-0 border-t bg-white/95 backdrop-blur p-3 hidden">
+    <div class="max-w-5xl mx-auto flex items-center justify-between">
+      <span class="text-sm text-slate-700">Tienes cambios sin guardar.</span>
+      <div class="flex gap-3">
+        <button id="btnDiscard" class="px-3 py-2 border rounded-lg">Descartar</button>
+        <button id="btnSave" class="px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white border border-green-600">
+          Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal nuevo/editar -->
+  <dialog id="itemDialog" class="rounded-xl p-0 border w-[520px]">
+    <form id="itemForm" class="p-5 space-y-3">
+      <h3 id="dlgTitle" class="text-lg font-medium">Nuevo ítem</h3>
+
+      <div>
+        <label class="block text-sm text-slate-700 mb-1">Etiqueta</label>
+        <input id="f_label" type="text" required class="w-full border rounded-lg px-3 py-2">
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm text-slate-700 mb-1">Tipo</label>
+          <select id="f_tipo" class="w-full border rounded-lg px-3 py-2">
+            <option value="url">URL</option>
+            <option value="categoria">Categoría</option>
+            <option value="subcategoria">Subcategoría</option>
+          </select>
+        </div>
+
+        <!-- URL -->
+        <div id="boxUrl">
+          <label class="block text-sm text-slate-700 mb-1">URL</label>
+          <input id="f_url" type="text" class="w-full border rounded-lg px-3 py-2" placeholder="/ofertas">
+        </div>
+
+        <!-- Categoría -->
+        <div id="boxCat" class="hidden">
+          <label class="block text-sm text-slate-700 mb-1">Categoría</label>
+          <select id="f_categoria" class="w-full border rounded-lg px-3 py-2">
+            <option value="">— Selecciona —</option>
+            {% for c in categorias %}
+              <option value="{{ c.id }}">{{ c.nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Subcategoría -->
+        <div id="boxSubcat" class="hidden">
+          <label class="block text-sm text-slate-700 mb-1">Subcategoría</label>
+          <select id="f_subcategoria" class="w-full border rounded-lg px-3 py-2">
+            <option value="">— Selecciona —</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <label class="inline-flex items-center gap-2">
+          <input id="f_visible" type="checkbox" checked>
+          <span class="text-sm">Visible</span>
+        </label>
+        <label class="inline-flex items-center gap-2">
+          <input id="f_blank" type="checkbox">
+          <span class="text-sm">Abrir en nueva pestaña</span>
+        </label>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button type="button" id="dlgCancel" class="px-3 py-2 border rounded-lg">Cancelar</button>
+        <button type="submit" id="dlgSubmit" class="px-3 py-2 rounded-lg bg-slate-800 text-white">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+</div>
+
+<script>
+(() => {
+  const log = (...a) => console.log("[menu-builder]", ...a);
+
+  const $menuSel = document.getElementById('menuSelect');
+  const $tree    = document.getElementById('tree');
+  const $empty   = document.getElementById('emptyBox');
+  const $bar     = document.getElementById('stickyBar');
+  const $btnSave = document.getElementById('btnSave');
+  const $btnDiscard = document.getElementById('btnDiscard');
+  const $btnNew  = document.getElementById('btnNew');
+
+  // dialog
+  const dlg      = document.getElementById('itemDialog');
+  const $form    = document.getElementById('itemForm');
+  const $dlgTitle= document.getElementById('dlgTitle');
+
+  const $f_label = document.getElementById('f_label');
+  const $f_tipo  = document.getElementById('f_tipo');
+  const $f_url   = document.getElementById('f_url');
+  const $f_cat   = document.getElementById('f_categoria');
+  const $f_sub   = document.getElementById('f_subcategoria');
+  const $f_vis   = document.getElementById('f_visible');
+  const $f_blank = document.getElementById('f_blank');
+
+  const $boxUrl = document.getElementById('boxUrl');
+  const $boxCat = document.getElementById('boxCat');
+  const $boxSub = document.getElementById('boxSubcat');
+
+  let DATA = [];
+  let DIRTY = false;
+  let EDITING_ID = null;
+
+  function setDirty(on) { DIRTY = !!on; $bar.classList.toggle('hidden', !DIRTY); }
+  window.addEventListener('beforeunload', (e) => { if (DIRTY) { e.preventDefault(); e.returnValue = ''; }});
+
+  // ---- FIX: mostrar/ocultar bloques correctamente y precargar subcats si aplica
+  function tipoUIChanged() {
+    const t = $f_tipo.value;
+    $boxUrl.classList.toggle('hidden', t !== 'url');
+    $boxCat.classList.toggle('hidden', t === 'url');
+    $boxSub.classList.toggle('hidden', t !== 'subcategoria');
+    if (t === 'subcategoria' && $f_cat.value) {
+      loadSubcats($f_cat.value);
+    }
+  }
+  $f_tipo.addEventListener('change', tipoUIChanged);
+  tipoUIChanged();
+
+  async function loadSubcats(catId) {
+    if (!catId) { $f_sub.innerHTML = '<option value="">— Selecciona —</option>'; return; }
+    $f_sub.innerHTML = '<option>Cargando…</option>';
+    try {
+      const r = await fetch(`/admin/subcategorias?id_categoria=${encodeURIComponent(catId)}`, {headers:{Accept:'application/json'}});
+      const j = await r.json(); const list = Array.isArray(j)?j:(j.items||[]);
+      $f_sub.innerHTML = '<option value="">— Selecciona —</option>';
+      for (const it of list) {
+        const opt = document.createElement('option');
+        opt.value = it.id; opt.textContent = it.nombre; $f_sub.appendChild(opt);
+      }
+    } catch(e) {
+      console.error(e);
+      $f_sub.innerHTML = '<option>Error</option>';
+    }
+  }
+  $f_cat.addEventListener('change', () => {
+    if ($f_tipo.value === 'subcategoria') loadSubcats($f_cat.value);
+  });
+
+  function renderTree() {
+    $tree.innerHTML = '';
+    if (!DATA.length) { $empty.classList.remove('hidden'); return; }
+    $empty.classList.add('hidden');
+
+    const makeRow = (node, depth=0) => {
+      const row = document.createElement('div');
+      row.className = 'group flex items-center px-2 py-1 border-b last:border-0';
+      row.dataset.id = node.id;
+      row.dataset.depth = depth;
+
+      const left = document.createElement('div');
+      left.className = 'w-7/12 flex items-center gap-2';
+      left.style.paddingLeft = `${depth*20 + 4}px`;
+
+      const label = document.createElement('input');
+      label.className = 'border rounded px-2 py-1 text-sm w-64';
+      label.value = node.label || '';
+      label.addEventListener('input', () => { node.label = label.value; setDirty(true); });
+
+      const vis = document.createElement('input');
+      vis.type='checkbox'; vis.checked = !!node.visible;
+      vis.addEventListener('change', () => { node.visible = vis.checked; setDirty(true); });
+
+      const info = document.createElement('span');
+      info.className = 'ml-2 text-xs text-slate-500';
+      info.textContent = node.tipo;
+
+      left.appendChild(label);
+      left.appendChild(info);
+      left.appendChild((() => { const s = document.createElement('span'); s.className='text-xs text-slate-400'; s.textContent = node.tipo==='categoria' && node.categoria_id ? `#${node.categoria_id}` : (node.tipo==='subcategoria'&&node.subcategoria_id?`#${node.subcategoria_id}`:''); return s;})());
+      left.appendChild((() => { const sp=document.createElement('span'); sp.className='ml-2 text-xs'; sp.textContent='Visible'; return sp; })());
+      left.appendChild(vis);
+
+      const mid = document.createElement('div');
+      mid.className = 'w-3/12 text-sm text-slate-600 truncate';
+      mid.textContent = node.destino || '';
+
+      const right = document.createElement('div');
+      right.className = 'w-2/12 text-right';
+
+      const btnUp   = htmlBtn('↑', 'Mover arriba', () => moveUp(node.id));
+      const btnDown = htmlBtn('↓', 'Mover abajo', () => moveDown(node.id));
+      const btnIn   = htmlBtn('→', 'Anidar bajo anterior', () => indent(node.id));
+      const btnOut  = htmlBtn('←', 'Quitar un nivel', () => outdent(node.id));
+      const btnEdit = htmlBtn('✎', 'Editar avanzado', () => openEdit(node));
+      const btnDel  = htmlBtn('🗑', 'Eliminar', () => removeNode(node.id));
+
+      right.append(btnUp, btnDown, btnIn, btnOut, btnEdit, btnDel);
+
+      row.append(left, mid, right);
+      $tree.appendChild(row);
+
+      // botón “importar subcategorías” para categorías
+      if (node.tipo === 'categoria' && node.categoria_id) {
+        const bar = document.createElement('div');
+        bar.className='pl-6 pb-2';
+        bar.style.paddingLeft = `${depth*20 + 8}px`;
+        const b = document.createElement('button');
+        b.className='mt-1 px-2 py-1 rounded bg-slate-800 text-white text-xs';
+        b.textContent='Agregar subcategorías como hijos';
+        b.addEventListener('click', () => importSubcats(node.id));
+        bar.appendChild(b);
+        $tree.appendChild(bar);
+      }
+
+      (node.children||[]).forEach(ch => makeRow(ch, depth+1));
+    };
+
+    DATA.forEach(n => makeRow(n, 0));
+  }
+
+  function htmlBtn(txt, title, cb){
+    const b = document.createElement('button');
+    b.type='button'; b.title=title;
+    b.className='mx-0.5 inline-flex items-center justify-center w-7 h-7 border rounded hover:bg-slate-50';
+    b.textContent = txt; b.addEventListener('click', cb);
+    return b;
+  }
+
+  function flatten(list, parentId=null, out=[], startOrder=0){
+    let order = startOrder;
+    for (const n of list) {
+      out.push({id:n.id, parent_id:parentId, orden:order++, label:n.label, visible:!!n.visible});
+      if (n.children && n.children.length) flatten(n.children, n.id, out, 0);
+    }
+    return out;
+  }
+
+  function findNode(id, list=DATA, parent=null){
+    for (let i=0;i<list.length;i++){
+      const n=list[i];
+      if (n.id===id) return {node:n, list, index:i, parent};
+      if (n.children && n.children.length){
+        const r = findNode(id, n.children, n);
+        if (r) return r;
+      }
+    }
+    return null;
+  }
+
+  function moveUp(id){
+    const ctx = findNode(id);
+    if (!ctx) return;
+    if (ctx.index===0) return;
+    [ctx.list[ctx.index-1], ctx.list[ctx.index]] = [ctx.list[ctx.index], ctx.list[ctx.index-1]];
+    setDirty(true); renderTree();
+  }
+  function moveDown(id){
+    const ctx = findNode(id);
+    if (!ctx) return;
+    if (ctx.index===ctx.list.length-1) return;
+    [ctx.list[ctx.index+1], ctx.list[ctx.index]] = [ctx.list[ctx.index], ctx.list[ctx.index+1]];
+    setDirty(true); renderTree();
+  }
+  function indent(id){
+    const ctx = findNode(id);
+    if (!ctx || ctx.index===0) return;
+    const prev = ctx.list[ctx.index-1];
+    ctx.list.splice(ctx.index,1);
+    prev.children = prev.children || [];
+    prev.children.push(ctx.node);
+    setDirty(true); renderTree();
+  }
+  function outdent(id){
+    const ctx = findNode(id);
+    if (!ctx || !ctx.parent) return;
+    const parentCtx = findNode(ctx.parent.id);
+    // quitar de hijos del padre
+    parentCtx.node.children.splice(parentCtx.node.children.indexOf(ctx.node),1);
+    // insertar después del padre en la lista del abuelo (o root)
+    const grand = findNode(parentCtx.node.id);
+    const list = grand.parent ? grand.parent.children : DATA;
+    const pos  = list.indexOf(parentCtx.node);
+    list.splice(pos+1, 0, ctx.node);
+    setDirty(true); renderTree();
+  }
+
+  function removeNode(id){
+    if (!confirm('¿Eliminar este ítem y sus posibles subítems?')) return;
+    const ctx = findNode(id);
+    if (!ctx) return;
+    ctx.list.splice(ctx.index,1);
+    setDirty(true); renderTree();
+    fetch(`/admin/api/menu/item/${id}`, {method:'DELETE'});
+  }
+
+  function openNew(){
+    EDITING_ID = null;
+    $dlgTitle.textContent = 'Nuevo ítem';
+    $f_label.value=''; $f_tipo.value='url'; $f_url.value='';
+    $f_cat.value=''; $f_sub.innerHTML='<option value="">— Selecciona —</option>';
+    $f_vis.checked = true; $f_blank.checked = false;
+    tipoUIChanged(); dlg.showModal();
+  }
+  function openEdit(node){
+    EDITING_ID = node.id;
+    $dlgTitle.textContent = 'Editar ítem';
+    $f_label.value = node.label || '';
+    $f_tipo.value = node.tipo || 'url';
+    $f_url.value  = node.url || '';
+    $f_cat.value  = node.categoria_id || '';
+    $f_vis.checked = !!node.visible;
+    $f_blank.checked = !!node.target_blank;
+    tipoUIChanged();
+    if (node.tipo==='subcategoria' && node.categoria_id){
+      loadSubcats(node.categoria_id).then(()=>{ if (node.subcategoria_id) $f_sub.value = String(node.subcategoria_id); });
+    }
+    dlg.showModal();
+  }
+
+  document.getElementById('dlgCancel').addEventListener('click', () => dlg.close());
+  document.getElementById('btnNew').addEventListener('click', openNew);
+
+  $form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const payload = {
+      menu: $menuSel.value,
+      label: $f_label.value.trim(),
+      tipo: $f_tipo.value,
+      url: ($f_tipo.value==='url') ? $f_url.value.trim() : null,
+      categoria_id: ($f_tipo.value!=='url') ? ($f_cat.value||null) : null,
+      subcategoria_id: ($f_tipo.value==='subcategoria') ? ($f_sub.value||null) : null,
+      visible: $f_vis.checked,
+      target_blank: $f_blank.checked
+    };
+    try {
+      if (!EDITING_ID){
+        const r = await fetch('/admin/api/menu/item', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+        await r.json().catch(()=>({}));
+      } else {
+        const r = await fetch(`/admin/api/menu/item/${EDITING_ID}`, {method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+        await r.json().catch(()=>({}));
+      }
+      dlg.close();
+      await loadData();
+      setDirty(true);
+    } catch(e) {
+      console.error(e); alert('No se pudo guardar el ítem.');
+    }
+  });
+
+  async function importSubcats(id){
+    try{
+      const r = await fetch(`/admin/menu/${id}/importar-subcategorias`, {method:'POST'});
+      if (!r.ok) throw new Error('HTTP '+r.status);
+      await r.json().catch(()=>({}));
+      await loadData();
+      setDirty(true);
+    }catch(e){
+      console.error(e);
+      alert('No se pudieron importar las subcategorías.');
+    }
+  }
+
+  async function loadData(){
+    const menu = $menuSel.value;
+    $tree.innerHTML = '<div class="p-4 text-sm text-slate-500">Cargando…</div>';
+    try{
+      const r = await fetch(`/admin/api/menu?menu=${encodeURIComponent(menu)}`, {headers:{Accept:'application/json'}});
+      const j = await r.json();
+      DATA = Array.isArray(j) ? j : (j.items || []);
+      renderTree();
+      setDirty(false);
+    }catch(e){
+      console.error(e);
+      $tree.innerHTML = '<div class="p-4 text-sm text-red-600">Error al cargar.</div>';
+    }
+  }
+
+  $menuSel.addEventListener('change', loadData);
+
+  $btnSave.addEventListener('click', async () => {
+    const flat = flatten(DATA);
+    try{
+      const r = await fetch('/admin/api/menu/reorder', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({menu: $menuSel.value, items: flat})});
+      if (!r.ok) throw new Error('HTTP '+r.status);
+      setDirty(false);
+    }catch(e){
+      console.error(e); alert('No se pudo guardar.');
+    }
+  });
+
+  $btnDiscard.addEventListener('click', () => { loadData(); });
+
+  // primera carga
+  loadData();
+})();
+</script>
+{% endblock %}

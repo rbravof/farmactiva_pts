@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Carrito | Farmactiva</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+  <style>
+    .card{transition:transform .2s, box-shadow .2s}
+    .card:hover{transform:translateY(-4px); box-shadow:0 12px 22px rgba(0,0,0,.08)}
+    .badge{font-size:.75rem}
+    .price-list{font-variant-numeric: tabular-nums}
+    .nav-link{position:relative}
+    .nav-link > .dropdown{display:none; position:absolute; left:0; top:100%; min-width:14rem; z-index:50}
+    .nav-link:hover > .dropdown{display:block}
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+  <!-- Barra de estado (igual a index) -->
+  <div id="estadoBar" class="hidden bg-yellow-50 text-yellow-800 text-sm">
+    <div class="max-w-7xl mx-auto px-4 py-2 flex items-center gap-2">
+      <i class="fas fa-info-circle"></i>
+      <span id="estadoMsg">Inicia sesión para ver precios a costo.</span>
+      <a href="/login" class="ml-auto text-yellow-900 underline font-medium">Iniciar sesión</a>
+    </div>
+  </div>
+
+  <!-- HEADER idéntico a index -->
+  <header class="bg-white shadow-sm sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4">
+      <div class="flex items-center justify-between py-4">
+        <a href="/"><img src="/static/images/logo/logo.png" alt="Farmactiva" class="h-10 md:h-12"></a>
+
+        <div class="hidden md:flex flex-1 max-w-3xl mx-6">
+          <div class="relative w-full">
+            <input id="q" type="search" placeholder="Busca un medicamento o producto…" class="w-full border border-gray-200 rounded-lg pl-11 pr-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none bg-gray-50" />
+            <i class="fas fa-search absolute left-3 top-2.5 text-gray-400"></i>
+          </div>
+        </div>
+
+        <nav class="flex items-center gap-4">
+          <a href="/login" id="loginLink" class="text-sm font-medium hover:text-green-600"><i class="far fa-user mr-2"></i> Iniciar sesión</a>
+          <a href="/perfil" id="perfilLink" class="hidden text-sm font-medium hover:text-green-600"><i class="far fa-user mr-2"></i> Mi cuenta</a>
+          <a href="/carrito" class="relative text-sm font-medium hover:text-green-600">
+            <i class="fas fa-shopping-cart mr-2"></i> Carrito
+            <span id="cartCount" class="absolute -top-2 -right-3 bg-green-600 text-white text-xs rounded-full px-1.5">0</span>
+          </a>
+        </nav>
+      </div>
+
+      <div class="md:hidden pb-3">
+        <div class="relative">
+          <input id="qMobile" type="search" placeholder="Buscar productos…" class="w-full border border-gray-200 rounded-lg pl-11 pr-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none bg-gray-50" />
+          <i class="fas fa-search absolute left-3 top-2.5 text-gray-400"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white border-t border-gray-100">
+      <nav class="max-w-7xl mx-auto px-4">
+        <ul class="flex items-center gap-6 text-sm font-medium text-green-900 py-3 overflow-x-auto">
+          <li class="nav-link">
+            <a href="/categoria/medicamentos" class="hover:text-green-700 flex items-center gap-2">Medicamentos <i class="fas fa-chevron-down text-xs"></i></a>
+            <div class="dropdown bg-white border border-gray-100 rounded-lg shadow-lg mt-2">
+              <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <a href="/categoria/medicamentos/genericos" class="px-3 py-2 rounded hover:bg-gray-50">Genéricos</a>
+                <a href="/categoria/medicamentos/bioequivalentes" class="px-3 py-2 rounded hover:bg-gray-50">Bioequivalentes</a>
+                <a href="/categoria/medicamentos/venta-libre" class="px-3 py-2 rounded hover:bg-gray-50">Venta libre</a>
+                <a href="/categoria/medicamentos/receta" class="px-3 py-2 rounded hover:bg-gray-50">Con receta</a>
+              </div>
+            </div>
+          </li>
+          <li class="nav-link">
+            <a href="/categoria/dermocosmetica" class="hover:text-green-700 flex items-center gap-2">Dermocosmética <i class="fas fa-chevron-down text-xs"></i></a>
+            <div class="dropdown bg-white border border-gray-100 rounded-lg shadow-lg mt-2">
+              <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <a href="/categoria/dermocosmetica/limpieza" class="px-3 py-2 rounded hover:bg-gray-50">Limpieza</a>
+                <a href="/categoria/dermocosmetica/hidratacion" class="px-3 py-2 rounded hover:bg-gray-50">Hidratación</a>
+                <a href="/categoria/dermocosmetica/antiage" class="px-3 py-2 rounded hover:bg-gray-50">Antiage</a>
+                <a href="/categoria/dermocosmetica/proteccion-solar" class="px-3 py-2 rounded hover:bg-gray-50">Protección solar</a>
+              </div>
+            </div>
+          </li>
+          <li class="nav-link">
+            <a href="/categoria/perfumeria" class="hover:text-green-700 flex items-center gap-2">Perfumería <i class="fas fa-chevron-down text-xs"></i></a>
+            <div class="dropdown bg-white border border-gray-100 rounded-lg shadow-lg mt-2">
+              <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <a href="/categoria/perfumeria/damas" class="px-3 py-2 rounded hover:bg-gray-50">Damas</a>
+                <a href="/categoria/perfumeria/caballeros" class="px-3 py-2 rounded hover:bg-gray-50">Caballeros</a>
+                <a href="/categoria/perfumeria/unisex" class="px-3 py-2 rounded hover:bg-gray-50">Unisex</a>
+                <a href="/categoria/perfumeria/sets" class="px-3 py-2 rounded hover:bg-gray-50">Sets</a>
+              </div>
+            </div>
+          </li>
+          <li class="nav-link">
+            <a href="/categoria/vitaminas" class="hover:text-green-700 flex items-center gap-2">Vitaminas <i class="fas fa-chevron-down text-xs"></i></a>
+            <div class="dropdown bg-white border border-gray-100 rounded-lg shadow-lg mt-2">
+              <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <a href="/categoria/vitaminas/multivitaminicos" class="px-3 py-2 rounded hover:bg-gray-50">Multivitamínicos</a>
+                <a href="/categoria/vitaminas/minerales" class="px-3 py-2 rounded hover:bg-gray-50">Minerales</a>
+                <a href="/categoria/vitaminas/omega" class="px-3 py-2 rounded hover:bg-gray-50">Omega</a>
+                <a href="/categoria/vitaminas/infantil" class="px-3 py-2 rounded hover:bg-gray-50">Infantil</a>
+              </div>
+            </div>
+          </li>
+          <li class="nav-link">
+            <a href="/categoria/suplementos" class="hover:text-green-700 flex items-center gap-2">Suplementos <i class="fas fa-chevron-down text-xs"></i></a>
+            <div class="dropdown bg-white border border-gray-100 rounded-lg shadow-lg mt-2">
+              <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <a href="/categoria/suplementos/deportivos" class="px-3 py-2 rounded hover:bg-gray-50">Deportivos</a>
+                <a href="/categoria/suplementos/mascotas" class="px-3 py-2 rounded hover:bg-gray-50">Mascotas</a>
+                <a href="/categoria/suplementos/herbales" class="px-3 py-2 rounded hover:bg-gray-50">Herbales</a>
+                <a href="/categoria/suplementos/otros" class="px-3 py-2 rounded hover:bg-gray-50">Otros</a>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-8">
+    <h1 class="text-2xl font-semibold mb-6">Tu carrito</h1>
+
+    <!-- Carrito vacío -->
+    <div id="emptyState" class="hidden bg-white border border-gray-100 rounded-xl p-8 text-center">
+      <p class="text-gray-600 mb-4">Tu carrito está vacío.</p>
+      <a href="/tienda" class="inline-block bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-lg font-semibold">
+        Ir a la tienda
+      </a>
+    </div>
+
+    <!-- Carrito con items -->
+    <div id="cartWrap" class="hidden grid md:grid-cols-3 gap-6">
+      <section class="md:col-span-2 bg-white border border-gray-100 rounded-xl p-4">
+        <div id="items" class="divide-y divide-gray-100"></div>
+      </section>
+
+      <aside class="bg-white border border-gray-100 rounded-xl p-4 h-max">
+        <h3 class="font-semibold mb-4">Resumen</h3>
+        <dl class="space-y-2 text-sm price-list">
+          <div class="flex justify-between"><dt class="text-gray-500">Subtotal</dt><dd id="subtotal" class="font-medium">$0</dd></div>
+          <div class="flex justify-between"><dt class="text-gray-500">Envío (estimado)</dt><dd id="shipping" class="font-medium">—</dd></div>
+          <div class="flex justify-between text-lg pt-2 border-t"><dt>Total</dt><dd id="total" class="font-semibold">$0</dd></div>
+        </dl>
+        <button id="checkoutBtn" class="w-full mt-5 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-semibold">Finalizar compra (MVP)</button>
+        <button id="clearBtn" class="w-full mt-3 bg-gray-100 hover:bg-gray-200 text-gray-800 py-2.5 rounded-lg font-semibold">Vaciar carrito</button>
+        <a href="/tienda" class="block text-center mt-3 text-green-700 hover:text-green-800 font-medium">Seguir comprando</a>
+      </aside>
+    </div>
+  </main>
+
+  <!-- Footer idéntico a index -->
+  <footer class="bg-gray-900 text-gray-300">
+    <div class="max-w-7xl mx-auto px-4 py-10 grid md:grid-cols-4 gap-8">
+      <div class="md:col-span-2">
+        <img src="/static/images/logo/logo.png" class="h-10 mb-4" alt="Farmactiva">
+        <p>Acceso a medicamentos con precios justos y transparentes.</p>
+      </div>
+      <div>
+        <h4 class="font-semibold mb-2 text-white">Ayuda</h4>
+        <ul class="space-y-1 text-sm">
+          <li><a href="/preguntas" class="hover:text-white">Preguntas frecuentes</a></li>
+          <li><a href="/contacto" class="hover:text-white">Contacto</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 class="font-semibold mb-2 text-white">Legal</h4>
+        <ul class="space-y-1 text-sm">
+          <li><a href="/terminos" class="hover:text-white">Términos y condiciones</a></li>
+          <li><a href="/privacidad" class="hover:text-white">Privacidad</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="border-t border-gray-800 text-sm text-gray-400">
+      <div class="max-w-7xl mx-auto px-4 py-4">&copy; 2025 Farmactiva</div>
+    </div>
+  </footer>
+
+  <script>
+    // ===== Utils comunes (localStorage Cart) =====
+    const CART_KEY='fa_cart';
+    const formatCLP = n => (n||0).toLocaleString('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0});
+    const getCart = () => { try{ return JSON.parse(localStorage.getItem(CART_KEY)) || {items:[]} } catch{ return {items:[]} } };
+    const saveCart = (c) => { localStorage.setItem(CART_KEY, JSON.stringify(c)); updateCartCount(); };
+    const updateCartCount = () => {
+      const el = document.getElementById('cartCount'); if(!el) return;
+      const c = getCart(); el.textContent = String(c.items.reduce((a,i)=>a+i.qty,0));
+    };
+    const setQty = (slug, qty) => {
+      const c = getCart();
+      const i = c.items.findIndex(x=>x.slug===slug);
+      if(i>-1){ c.items[i].qty = Math.max(1, qty||1); saveCart(c); }
+    };
+    const removeItem = (slug) => {
+      const c = getCart();
+      c.items = c.items.filter(x=>x.slug!==slug);
+      saveCart(c);
+    };
+
+    // ===== Estado sesión (opcional igual que index) =====
+    let suscripcionActiva=false, logged=false;
+    async function cargarEstado(){
+      try{ const r = await fetch('/api/suscripcion/estado',{credentials:'include'});
+        if(r.ok){ const j=await r.json(); suscripcionActiva=!!j.activa; logged=!!j.logged; }
+      }catch(e){}
+      const bar=document.getElementById('estadoBar');
+      const msg=document.getElementById('estadoMsg');
+      const loginLink=document.getElementById('loginLink');
+      const perfilLink=document.getElementById('perfilLink');
+      if(logged){ loginLink.classList.add('hidden'); perfilLink.classList.remove('hidden'); }
+      if(!suscripcionActiva){ bar.classList.remove('hidden'); msg.textContent='Tu suscripción no está activa. Verás precio público.'; } else { bar.classList.add('hidden'); }
+    }
+
+    // ===== Render del carrito =====
+    function renderCart(){
+      updateCartCount();
+      const {items}=getCart();
+      const empty = document.getElementById('emptyState');
+      const wrap  = document.getElementById('cartWrap');
+      const list  = document.getElementById('items');
+      const subtotalEl = document.getElementById('subtotal');
+      const totalEl = document.getElementById('total');
+
+      if(!items.length){
+        empty.classList.remove('hidden');
+        wrap.classList.add('hidden');
+        subtotalEl.textContent = totalEl.textContent = formatCLP(0);
+        return;
+      }
+      empty.classList.add('hidden');
+      wrap.classList.remove('hidden');
+
+      list.innerHTML = '';
+      let subtotal = 0;
+
+      items.forEach(it=>{
+        const line = it.precio * it.qty;
+        subtotal += line;
+
+        const row = document.createElement('div');
+        row.className = "py-4 flex items-center gap-4";
+        row.innerHTML = `
+          <img src="${it.image || '/static/images/productos/Kitadol_(B)_Paracetamol_500_mg_24_Comprimidos.jpg'}"
+               alt="${it.nombre}" class="w-16 h-16 object-contain bg-gray-50 rounded">
+          <div class="flex-1">
+            <div class="font-medium">${it.nombre}</div>
+            <div class="text-sm text-gray-500">Precio: ${formatCLP(it.precio)}</div>
+            <button class="text-xs text-red-600 hover:text-red-700 mt-1 remove" data-slug="${it.slug}">
+              <i class="far fa-trash-alt mr-1"></i>Eliminar
+            </button>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="inline-flex items-center border rounded-lg">
+              <button class="px-3 py-1 qty-dec" data-slug="${it.slug}">−</button>
+              <input type="number" min="1" value="${it.qty}" class="w-14 text-center py-1 qty-input" data-slug="${it.slug}">
+              <button class="px-3 py-1 qty-inc" data-slug="${it.slug}">+</button>
+            </div>
+            <div class="w-24 text-right font-semibold">${formatCLP(line)}</div>
+          </div>
+        `;
+        list.appendChild(row);
+      });
+
+      subtotalEl.textContent = formatCLP(subtotal);
+      totalEl.textContent = formatCLP(subtotal); // sin envío en MVP
+    }
+
+    // ===== Eventos =====
+    document.addEventListener('click',(e)=>{
+      const slugDec = e.target.closest('.qty-dec')?.dataset.slug;
+      const slugInc = e.target.closest('.qty-inc')?.dataset.slug;
+      const slugRem = e.target.closest('.remove')?.dataset.slug;
+
+      if(slugDec){ const c=getCart(); const it=c.items.find(x=>x.slug===slugDec); if(it){ setQty(slugDec, it.qty-1); renderCart(); } }
+      if(slugInc){ const c=getCart(); const it=c.items.find(x=>x.slug===slugInc); if(it){ setQty(slugInc, it.qty+1); renderCart(); } }
+      if(slugRem){ removeItem(slugRem); renderCart(); }
+    });
+
+    document.addEventListener('input',(e)=>{
+      const inp = e.target.closest('.qty-input'); if(!inp) return;
+      const slug = inp.dataset.slug; const v = parseInt(inp.value||"1",10);
+      setQty(slug, isNaN(v)?1:v); renderCart();
+    });
+
+    document.getElementById('clearBtn').addEventListener('click', ()=>{
+      localStorage.setItem(CART_KEY, JSON.stringify({items:[]}));
+      renderCart();
+    });
+
+    document.getElementById('checkoutBtn').addEventListener('click', ()=>{
+      alert('🧪 MVP: aquí iría el flujo de checkout.');
+    });
+
+    // Init
+    cargarEstado().then(renderCart);
+  </script>
+</body>
+</html>

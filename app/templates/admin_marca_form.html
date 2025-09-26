@@ -1,0 +1,89 @@
+{% extends "base_admin.html" %}
+{% block title %}{{ 'Editar' if item else 'Nueva' }} marca{% endblock %}
+{% block content %}
+<div class="max-w-xl mx-auto p-6">
+  <h1 class="text-xl font-semibold mb-4">{{ 'Editar' if item else 'Nueva' }} marca</h1>
+
+  {% if error %}
+  <div class="mb-4 p-3 rounded bg-red-50 text-red-700 border border-red-200">{{ error }}</div>
+  {% endif %}
+
+  <form method="post"
+        action="{{ '/admin/marcas/' ~ item.id ~ '/editar' if item else '/admin/marcas/nueva' }}"
+        enctype="multipart/form-data"
+        class="bg-white border rounded-lg p-4 space-y-4">
+
+    <div>
+      <label class="block text-sm mb-1">Nombre</label>
+      <input name="nombre" type="text" required
+             class="w-full border rounded-lg px-3 py-2"
+             value="{{ item.nombre if item else '' }}" placeholder="Vichy">
+    </div>
+
+    <div>
+      <label class="block text-sm mb-1">Slug</label>
+      <input name="slug" type="text"
+             class="w-full border rounded-lg px-3 py-2"
+             value="{{ item.slug if item else '' }}" placeholder="vichy">
+      <p class="text-xs text-gray-500 mt-1">Si lo dejas vacío, se genera automáticamente desde el nombre.</p>
+    </div>
+
+    <div class="flex gap-3">
+      <div class="flex-1">
+        <label class="block text-sm mb-1">Orden</label>
+        <input name="orden" type="number"
+               class="w-full border rounded-lg px-3 py-2"
+               value="{{ item.orden if item else 0 }}">
+      </div>
+      <div class="flex items-end gap-2">
+        <input id="visible" name="visible" type="checkbox" value="true"
+               {% if item and item.visible %}checked{% endif %}>
+        <label for="visible">Visible</label>
+      </div>
+    </div>
+
+    <!-- Logo -->
+    <div>
+      <label class="block text-sm mb-1">Logo (PNG/JPG/WebP/SVG/GIF)</label>
+      <input id="logo" name="logo" type="file"
+             accept=".png,.jpg,.jpeg,.webp,.gif,.svg"
+             class="w-full border rounded-lg px-3 py-2 bg-white">
+      {% if item and item.logo_url %}
+        <div class="mt-3 flex items-center gap-4">
+          <img src="{{ item.logo_url }}" alt="Logo actual"
+               class="h-12 object-contain bg-white border rounded p-1">
+          <label class="inline-flex items-center gap-2 text-sm">
+            <input type="checkbox" name="remove_logo" value="true">
+            Quitar logo
+          </label>
+        </div>
+      {% endif %}
+      <div id="preview" class="mt-3 hidden">
+        <p class="text-xs text-gray-500 mb-1">Vista previa:</p>
+        <img id="previewImg" class="h-12 object-contain bg-white border rounded p-1" alt="Preview">
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <a href="/admin/marcas" class="px-3 py-2 border rounded-lg">Cancelar</a>
+      <button type="submit" class="px-3 py-2 bg-green-600 text-white rounded-lg">Guardar</button>
+    </div>
+  </form>
+</div>
+
+<script>
+  (function () {
+    const input = document.getElementById('logo');
+    const box = document.getElementById('preview');
+    const img = document.getElementById('previewImg');
+    if (!input) return;
+    input.addEventListener('change', () => {
+      const file = input.files && input.files[0];
+      if (!file) { box.classList.add('hidden'); return; }
+      const url = URL.createObjectURL(file);
+      img.src = url;
+      box.classList.remove('hidden');
+    });
+  })();
+</script>
+{% endblock %}

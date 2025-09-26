@@ -1,0 +1,61 @@
+{% extends "base_admin.html" %}
+{% block title %}Clientes · Admin{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto p-6">
+  <div class="flex items-center justify-between mb-5">
+    <h1 class="text-2xl font-semibold">Clientes</h1>
+    <a href="/admin/clientes/nuevo" class="px-3 py-2 bg-green-600 text-white rounded-lg">Nuevo cliente</a>
+  </div>
+
+  <!-- Filtros -->
+  <form method="get" class="bg-white border rounded-xl p-4 mb-4 grid grid-cols-1 md:grid-cols-6 gap-3">
+    <input name="q" value="{{ request.query_params.get('q','') }}" placeholder="Buscar por nombre, RUT o email"
+           class="md:col-span-3 border rounded-lg px-3 py-2">
+    <select name="estado" class="border rounded-lg px-3 py-2">
+      <option value="">Todos</option>
+      <option value="activos"   {{ 'selected' if request.query_params.get('estado')=='activos' else '' }}>Activos</option>
+      <option value="inactivos" {{ 'selected' if request.query_params.get('estado')=='inactivos' else '' }}>Inactivos</option>
+    </select>
+    <button class="px-3 py-2 border rounded-lg">Filtrar</button>
+  </form>
+
+  <!-- Tabla -->
+  <div class="bg-white border rounded-xl overflow-x-auto">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-3 py-2 text-left">Nombre</th>
+          <th class="px-3 py-2 text-left">RUT</th>
+          <th class="px-3 py-2 text-left">Email</th>
+          <th class="px-3 py-2 text-left">Teléfono</th>
+          <th class="px-3 py-2 text-center">Pedidos</th>
+          <th class="px-3 py-2 text-center">Estado</th>
+          <th class="px-3 py-2 w-40"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in rows or [] %}
+        <tr class="border-t">
+          <td class="px-3 py-2 font-medium">{{ c.nombre }}</td>
+          <td class="px-3 py-2">{{ c.rut or '—' }}</td>
+          <td class="px-3 py-2">{{ c.email or '—' }}</td>
+          <td class="px-3 py-2">{{ c.telefono or '—' }}</td>
+          <td class="px-3 py-2 text-center">{{ c.pedidos_count or 0 }}</td>
+          <td class="px-3 py-2 text-center">
+            <span class="text-xs px-2 py-0.5 rounded-full {{ 'bg-green-100 text-green-700' if c.activo else 'bg-slate-100 text-slate-700' }}">
+              {{ 'Activo' if c.activo else 'Inactivo' }}
+            </span>
+          </td>
+          <td class="px-3 py-2 text-right">
+            <a href="/admin/clientes/{{ c.id_cliente }}/editar" class="px-2 py-1 text-blue-700">Editar</a>
+            <a href="/admin/pedidos?q={{ c.nombre|urlencode }}" class="px-2 py-1 text-slate-700">Ver pedidos</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td class="px-3 py-4 text-gray-500" colspan="7">No hay clientes.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

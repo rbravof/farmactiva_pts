@@ -1,0 +1,116 @@
+{% extends "base_admin.html" %}
+{% block title %}{{ 'Nuevo margen' if mode == 'new' else 'Editar margen' }}{% endblock %}
+
+{% block content %}
+{# Usa la variable 'scope' que envía el router: 'tipo' | 'categoria' #}
+{% set SCOPE = (scope if scope is defined else 'tipo') %}
+{% set SAVE_URL = '/admin/pts/margenes/categoria/guardar' if SCOPE == 'categoria' else '/admin/pts/margenes/tipo/guardar' %}
+
+<div class="max-w-3xl mx-auto p-6">
+  <a href="/admin/pts/margenes" class="text-sm text-slate-600 hover:underline">Volver</a>
+  <h1 class="text-2xl font-semibold mt-2">
+    {% if SCOPE == 'categoria' %}
+      {{ 'Nuevo margen por Categoría' if mode == 'new' else 'Editar margen por Categoría' }}
+    {% else %}
+      {{ 'Nuevo margen por Tipo de medicamento' if mode == 'new' else 'Editar margen por Tipo de medicamento' }}
+    {% endif %}
+  </h1>
+
+  <div class="bg-white border rounded-xl p-5 mt-4">
+    <form id="frmMargen" method="post" action="{{ SAVE_URL }}" class="space-y-5">
+      {% if SCOPE == 'categoria' %}
+        {% if mode == 'new' %}
+          <div>
+            <label class="block text-sm text-slate-700 mb-1">Categoría</label>
+            <select id="id_categoria" name="id_categoria" class="w-full border rounded-lg px-3 py-2">
+              {% for c in categorias %}
+                <option value="{{ c.id }}">{{ c.nombre }}</option>
+              {% endfor %}
+            </select>
+            <p class="text-xs text-slate-500 mt-1">Sólo se listan categorías sin margen configurado.</p>
+          </div>
+        {% else %}
+          <div>
+            <label class="block text-sm text-slate-700 mb-1">Categoría</label>
+            <input type="text" class="w-full border rounded-lg px-3 py-2 bg-slate-50" value="{{ item.nombre }}" disabled>
+            <input type="hidden" id="id_categoria" name="id_categoria" value="{{ item.id }}">
+          </div>
+        {% endif %}
+      {% else %}
+        {% if mode == 'new' %}
+          <div>
+            <label class="block text-sm text-slate-700 mb-1">Tipo de medicamento</label>
+            <select id="id_tipo_medicamento" name="id_tipo_medicamento" class="w-full border rounded-lg px-3 py-2">
+              {% for t in tipos %}
+                <option value="{{ t.id_tipo_medicamento }}">{{ t.nombre }}</option>
+              {% endfor %}
+            </select>
+            <p class="text-xs text-slate-500 mt-1">Sólo aparecen tipos que aún no tienen margen configurado.</p>
+          </div>
+        {% else %}
+          <div>
+            <label class="block text-sm text-slate-700 mb-1">Tipo de medicamento</label>
+            <input type="text" class="w-full border rounded-lg px-3 py-2 bg-slate-50" value="{{ item.nombre }}" disabled>
+            <input type="hidden" id="id_tipo_medicamento" name="id_tipo_medicamento" value="{{ item.id_tipo_medicamento }}">
+          </div>
+        {% endif %}
+      {% endif %}
+
+      <div>
+        <label class="block text-sm text-slate-700 mb-1">Margen (%)</label>
+        <input id="margen_pct" type="number" step="0.01" min="0" max="500"
+               class="w-40 border rounded-lg px-3 py-2 text-right"
+               value="{% if mode == 'edit' and item.margen is not none %}{{ (item.margen|float * 100)|round(2) }}{% endif %}">
+        <!-- hidden real value (fracción) que se enviará -->
+        <input id="margen_val" name="margen" type="hidden" value="">
+        <p class="text-xs text-slate-500 mt-1">
+          Ingresa el valor en <b>%</b>. Ej: <code>5</code> = 5%. También acepta <code>0.05</code> (= 5%).
+          {% if mode == 'new' %}
+            Si no estás seguro, el margen por defecto actual es <b>{{ (margen_default|float * 100)|round(2) }}%</b>.
+          {% endif %}
+          {% if SCOPE == 'categoria' %}
+            <br>Nota: el margen por <em>Categoría</em> tiene prioridad sobre el margen por <em>Tipo</em>.
+          {% endif %}
+        </p>
+      </div>
+
+      <div class="flex items-center justify-end gap-3">
+        <a href="/admin/pts/margenes" class="px-3 py-2 border rounded-lg">Cancelar</a>
+        <button id="btnGuardar" type="submit"
+                class="px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white border border-green-600">
+          Guardar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const $form = document.getElementById('frmMargen');
+    const $pct  = document.getElementById('margen_pct');
+    const $val  = document.getElementById('margen_val');
+
+    function parseMarginToDecimal(valueStr) {
+      if (valueStr == null) return null;
+      const s = String(valueStr).replace('%','').trim();
+      if (!s) return null;
+      const v = Number(s);
+      if (!isFinite(v) || v < 0) return null;
+      return (v <= 1 ? v : (v / 100));
+    }
+
+    // Completa el hidden antes de enviar
+    $form?.addEventListener('submit', (ev) => {
+      const dec = parseMarginToDecimal($pct?.value);
+      if (dec == null) {
+        ev.preventDefault();
+        alert('Ingresa un margen válido.');
+        return false;
+      }
+      $val.value = String(dec);
+      return true;
+    });
+  })();
+</script>
+{% endblock %}

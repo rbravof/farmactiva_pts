@@ -1,0 +1,110 @@
+{% extends "base_admin.html" %}
+{% block title %}Reglas de Precio · Márgenes PTS{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto p-6 space-y-6">
+  <h1 class="text-2xl font-semibold">Reglas de Precio · Márgenes PTS</h1>
+
+  {% if ok %}
+    <div class="p-3 rounded border border-green-200 bg-green-50 text-green-700 text-sm">
+      Acción completada: {{ ok }}
+    </div>
+  {% elif err %}
+    <div class="p-3 rounded border border-red-200 bg-red-50 text-red-700 text-sm">
+      Error: {{ err }}
+    </div>
+  {% endif %}
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Por Tipo de Medicamento -->
+    <section class="bg-white border rounded-xl p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-medium">Márgenes por Tipo de medicamento</h2>
+        <a href="/admin/pts/margenes/nuevo" class="text-sm px-3 py-1.5 rounded bg-slate-800 text-white">Nuevo</a>
+      </div>
+
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-slate-600">
+            <th class="py-2">Tipo</th>
+            <th class="py-2 w-28 text-right">Margen</th>
+            <th class="py-2 w-28"></th>
+          </tr>
+        </thead>
+        <tbody>
+        {% if tipos and tipos|length > 0 %}
+          {% for t in tipos %}
+          <tr class="border-t">
+            <td class="py-2">{{ t.nombre }}</td>
+            <td class="py-2 text-right">
+              {% if t.margen is not none %}
+                {{ (t.margen * 100) | round(2) }}%
+              {% else %}
+                <span class="text-slate-400">—</span>
+              {% endif %}
+            </td>
+            <td class="py-2 text-right">
+              <a href="/admin/pts/margenes/{{ t.id_tipo_medicamento }}/editar" class="text-slate-700 hover:underline">Editar</a>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr class="border-t">
+            <td class="py-6 text-slate-500" colspan="3">No hay tipos cargados.</td>
+          </tr>
+        {% endif %}
+        </tbody>
+      </table>
+
+      <p class="text-xs text-slate-500 mt-3">
+        Default si no hay margen definido: <strong>{{ (margen_default|float * 100) | round(2) }}%</strong>
+      </p>
+    </section>
+
+    <!-- Por Categoría -->
+    <section class="bg-white border rounded-xl p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-medium">Márgenes por Categoría</h2>
+        <a href="/admin/pts/margenes/categorias/nuevo" class="text-sm px-3 py-1.5 rounded bg-slate-800 text-white">Nuevo</a>
+      </div>
+
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-slate-600">
+            <th class="py-2">Categoría</th>
+            <th class="py-2 w-28 text-right">Margen</th>
+            <th class="py-2 w-28"></th>
+          </tr>
+        </thead>
+        <tbody>
+        {% if categorias is defined and categorias and categorias|length > 0 %}
+          {% for c in categorias %}
+          <tr class="border-t">
+            <td class="py-2">{{ c.nombre }}</td>
+            <td class="py-2 text-right">
+              {% if c.margen is not none %}
+                {{ (c.margen * 100) | round(2) }}%
+              {% else %}
+                <span class="text-slate-400">—</span>
+              {% endif %}
+            </td>
+            <td class="py-2 text-right">
+              <a href="/admin/pts/margenes/categorias/{{ c.id }}/editar" class="text-slate-700 hover:underline">Editar</a>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr class="border-t">
+            <td class="py-6 text-slate-500" colspan="3">No hay categorías con margen configurado.</td>
+          </tr>
+        {% endif %}
+        </tbody>
+      </table>
+
+      <p class="text-xs text-slate-500 mt-3">
+        <strong>Prioridad de resolución:</strong> Margen por <em>Categoría</em> &gt; Margen por <em>Tipo de medicamento</em> &gt; <em>Default</em>.
+      </p>
+    </section>
+  </div>
+</div>
+{% endblock %}

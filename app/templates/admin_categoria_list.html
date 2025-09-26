@@ -1,0 +1,270 @@
+{% extends "base_admin.html" %}
+{% block title %}Categorías · Admin{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto p-6">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-xl font-semibold">Categorías</h1>
+    <a href="/admin/categorias/nueva" class="px-3 py-2 bg-green-600 text-white rounded-lg">Nueva</a>
+  </div>
+
+  <div class="bg-white border rounded-lg overflow-hidden">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-3 py-2 text-left">Nombre</th>
+          <th class="px-3 py-2 text-left">Slug</th>
+          <th class="px-3 py-2 text-center w-48">Subcategorías</th>
+          <th class="px-3 py-2 text-center">Visible</th>
+          <th class="px-3 py-2 text-center">Orden</th>
+          <th class="px-3 py-2 w-40"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr class="border-t">
+          <td class="px-3 py-2">{{ r.nombre }}</td>
+          <td class="px-3 py-2 text-gray-600">{{ r.slug }}</td>
+
+          <!-- Subcategorías: conteo + botón Ver -->
+          <td class="px-3 py-2 text-center">
+            {% if r.subcats_activas is defined and r.subcats_total is defined %}
+              <div class="inline-flex items-center gap-2">
+                <span class="rounded-full bg-green-100 text-green-700 text-xs px-2 py-0.5">
+                  {{ r.subcats_activas }}
+                </span>
+                <span class="text-gray-400">/</span>
+                <span class="rounded-full bg-gray-100 text-gray-700 text-xs px-2 py-0.5">
+                  {{ r.subcats_total }}
+                </span>
+                <button type="button"
+                        class="text-blue-700 text-xs underline"
+                        data-subcat-open
+                        data-id="{{ r.id }}"
+                        data-nombre="{{ r.nombre }}">
+                  Ver
+                </button>
+              </div>
+            {% else %}
+              —
+            {% endif %}
+          </td>
+
+          <td class="px-3 py-2 text-center">{{ 'Sí' if r.visible else 'No' }}</td>
+          <td class="px-3 py-2 text-center">{{ r.orden if r.orden is not none else '—' }}</td>
+
+          <td class="px-3 py-2 text-right whitespace-nowrap">
+            <form action="/admin/categorias/{{ r.id }}/toggle" method="post" class="inline">
+              <button class="px-2 py-1 text-sm {{ 'text-gray-600' if r.visible else 'text-green-700' }}"
+                      title="{{ 'Ocultar' if r.visible else 'Publicar' }}">
+                {{ 'Ocultar' if r.visible else 'Publicar' }}
+              </button>
+            </form>
+
+            <a href="/admin/categorias/{{ r.id }}/editar" class="px-2 py-1 text-blue-700">Editar</a>
+
+            <form action="/admin/categorias/{{ r.id }}/eliminar" method="post" class="inline"
+                  onsubmit="return confirm('¿Eliminar esta categoría?');">
+              <button class="px-2 py-1 text-red-700" type="submit">Eliminar</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td class="px-3 py-4 text-gray-500" colspan="6">No hay categorías.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal Subcategorías (moderno, scrollable, con edición inline) -->
+<div id="subcatModal" class="fixed inset-0 z-50 hidden">
+  <!-- overlay -->
+  <div class="absolute inset-0 bg-black/40 backdrop-blur-[1px]" data-subcat-close></div>
+
+  <!-- wrapper centrado -->
+  <div class="relative z-10 flex min-h-full items-start sm:items-center justify-center p-4">
+    <!-- panel -->
+    <div class="w-full max-w-2xl bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col max-h-screen sm:h-5/6 overflow-hidden">
+      <!-- header -->
+      <div class="px-5 py-4 border-b flex items-center justify-between sticky top-0 bg-white">
+        <div class="flex items-center gap-2">
+          <div class="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center">
+            <svg viewBox="0 0 24 24" class="w-5 h-5 text-slate-600"><path fill="currentColor" d="M12,3A9,9 0 1,0 21,12A9,9 0 0,0 12,3M7,9H17V11H7V9M7,13H14V15H7V13Z"/></svg>
+          </div>
+          <div>
+            <h3 id="subcatModalTitle" class="font-semibold">Subcategorías</h3>
+            <p id="subcatModalSubtitle" class="text-xs text-slate-500">—</p>
+          </div>
+        </div>
+        <button class="p-2 rounded-lg hover:bg-slate-100 text-slate-600" title="Cerrar" data-subcat-close>
+          &#10005;
+        </button>
+      </div>
+
+      <!-- tools -->
+      <div class="px-5 py-3 border-b bg-white sticky top-[60px]">
+        <div class="relative">
+          <input id="subcatSearch" type="text" placeholder="Buscar subcategoría..."
+                 class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
+          <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">Ctrl/⌘+F</span>
+        </div>
+      </div>
+
+      <!-- contenido scrolleable -->
+      <div class="flex-1 overflow-y-auto p-0" style="-webkit-overflow-scrolling: touch;">
+        <ul id="subcatModalList" class="divide-y">
+          <li class="py-4 text-sm text-slate-500 text-center">Cargando…</li>
+        </ul>
+      </div>
+
+      <!-- footer -->
+      <div class="px-5 py-3 border-t bg-white text-right">
+        <button class="px-3 py-2 border rounded-lg hover:bg-slate-50" data-subcat-close>Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const modal = document.getElementById('subcatModal');
+  const title = document.getElementById('subcatModalTitle');
+  const subtitle = document.getElementById('subcatModalSubtitle');
+  const list  = document.getElementById('subcatModalList');
+  const inputSearch = document.getElementById('subcatSearch');
+
+  function tplItem(it){
+    const activeBadge = it.activo
+      ? '<span class="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700">Activa</span>'
+      : '<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">Inactiva</span>';
+    return `
+      <li class="group">
+        <div class="px-5 py-3 flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="font-medium truncate" data-name>${it.nombre}</span>
+              ${activeBadge}
+            </div>
+            <div class="text-xs text-slate-400 truncate">Slug: <span data-slug>${it.slug||''}</span></div>
+          </div>
+          <div class="flex items-center gap-1 opacity-70 group-hover:opacity-100">
+            <button class="px-2 py-1 rounded-lg hover:bg-slate-100 text-sky-700" data-edit data-id="${it.id}">Editar</button>
+          </div>
+        </div>
+
+        <!-- editor inline (hidden por defecto) -->
+        <div class="hidden px-5 pb-4" data-editor>
+          <form data-form data-id="${it.id}" class="flex items-center gap-2">
+            <input name="nombre" type="text" class="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                   value="${it.nombre}">
+            <button class="px-3 py-2 rounded-xl bg-sky-600 text-white text-sm hover:bg-sky-700" data-save>Guardar</button>
+            <button type="button" class="px-3 py-2 rounded-xl border text-sm hover:bg-slate-50" data-cancel>Cancelar</button>
+          </form>
+          <p class="mt-1 text-xs text-slate-500">Tip: este campo funciona como “descripción corta / etiqueta”.</p>
+        </div>
+      </li>
+    `;
+  }
+
+  function filterList(q){
+    const items = list.querySelectorAll('li');
+    const query = q.trim().toLowerCase();
+    items.forEach(li => {
+      const name = (li.querySelector('[data-name]')?.textContent || '').toLowerCase();
+      li.classList.toggle('hidden', query && !name.includes(query));
+    });
+  }
+
+  async function openSubcats(id, nombre) {
+    title.textContent = `Subcategorías de ${nombre}`;
+    subtitle.textContent = 'Administra y edita sus nombres/“descripción corta”.';
+    list.innerHTML = `<li class="py-4 text-sm text-slate-500 text-center">Cargando…</li>`;
+    inputSearch.value = '';
+    modal.classList.remove('hidden');
+
+    try {
+      const res = await fetch(`/admin/subcategorias?id_categoria=${encodeURIComponent(id)}`, {
+        headers: { 'Accept': 'application/json' }
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error('Respuesta inválida');
+
+      if (!data.items || !data.items.length) {
+        list.innerHTML = `<li class="py-4 text-sm text-slate-500 text-center">No hay subcategorías.</li>`;
+        return;
+      }
+      list.innerHTML = data.items.map(tplItem).join('');
+    } catch (e) {
+      console.error(e);
+      list.innerHTML = `<li class="py-4 text-sm text-red-600 text-center">No fue posible cargar subcategorías.</li>`;
+    }
+  }
+
+  // Eventos globales: abrir/cerrar y edición inline
+  document.addEventListener('click', async (ev) => {
+    const btnOpen = ev.target.closest('[data-subcat-open]');
+    if (btnOpen) {
+      openSubcats(btnOpen.dataset.id, btnOpen.dataset.nombre);
+      return;
+    }
+    if (ev.target.matches('[data-subcat-close]')) {
+      modal.classList.add('hidden');
+      return;
+    }
+
+    // Abrir editor inline
+    const btnEdit = ev.target.closest('[data-edit]');
+    if (btnEdit) {
+      const li = btnEdit.closest('li');
+      li.querySelector('[data-editor]').classList.remove('hidden');
+      return;
+    }
+
+    // Cancelar edición
+    const btnCancel = ev.target.closest('[data-cancel]');
+    if (btnCancel) {
+      const li = btnCancel.closest('li');
+      li.querySelector('[data-editor]').classList.add('hidden');
+      return;
+    }
+
+    // Guardar edición
+    const btnSave = ev.target.closest('[data-save]');
+    if (btnSave) {
+      ev.preventDefault();
+      const form = btnSave.closest('form');
+      const id = form.getAttribute('data-id');
+      const fd = new FormData(form);
+
+      btnSave.disabled = true;
+      btnSave.textContent = 'Guardando…';
+
+      try {
+        const resp = await fetch(`/admin/subcategorias/${id}/actualizar`, { method: 'POST', body: fd });
+        const data = await resp.json();
+        if (!data.ok) throw new Error(data.error || 'No fue posible actualizar');
+
+        // Refrescar vista del item
+        const li = form.closest('li');
+        li.querySelector('[data-name]').textContent = data.nombre;
+        li.querySelector('[data-slug]').textContent = data.slug || '';
+        li.querySelector('[data-editor]').classList.add('hidden');
+      } catch (e) {
+        alert(e.message || 'Error al guardar');
+      } finally {
+        btnSave.disabled = false;
+        btnSave.textContent = 'Guardar';
+      }
+    }
+  });
+
+  // Búsqueda en vivo
+  inputSearch?.addEventListener('input', (e) => filterList(e.target.value));
+
+  // Cerrar con ESC
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') modal.classList.add('hidden');
+  });
+</script>
+{% endblock %}

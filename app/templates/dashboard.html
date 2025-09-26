@@ -1,0 +1,52 @@
+{% extends "base_admin.html" %}
+{% block title %}Dashboard · Admin{% endblock %}
+
+{% block content %}
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+    <div class="bg-white border rounded-xl shadow p-4">
+      <div class="text-sm text-gray-500">Productos publicados</div>
+      <div class="text-2xl font-semibold mt-1">—</div>
+    </div>
+    <div class="bg-white border rounded-xl shadow p-4">
+      <div class="text-sm text-gray-500">Variantes con stock</div>
+      <div class="text-2xl font-semibold mt-1">—</div>
+    </div>
+    <div class="bg-white border rounded-xl shadow p-4">
+      <div class="text-sm text-gray-500">Pedidos últimos 7 días</div>
+      <div class="text-2xl font-semibold mt-1">—</div>
+    </div>
+  </div>
+
+  <div class="bg-white border rounded-xl shadow p-4">
+    <h2 class="text-lg font-semibold mb-3">Accesos rápidos</h2>
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+      <!-- Productos -->
+      <a href="/admin/productos/nuevo" class="block border rounded-lg p-4 hover:shadow">
+        <div class="text-sm font-medium">Crear producto</div>
+        <div class="text-xs text-gray-500">Añadir un nuevo producto</div>
+      </a>
+      <a href="/admin/productos/carga" class="block border rounded-lg p-4 hover:shadow">
+        <div class="text-sm font-medium">Carga masiva</div>
+        <div class="text-xs text-gray-500">Subir CSV de productos</div>
+      </a>
+      <a href="/admin/marcas" class="block border rounded-lg p-4 hover:shadow">
+        <div class="text-sm font-medium">Marcas</div>
+        <div class="text-xs text-gray-500">Gestionar marcas</div>
+      </a>
+      <a href="/admin/categorias" class="block border rounded-lg p-4 hover:shadow">
+        <div class="text-sm font-medium">Categorías</div>
+        <div class="text-xs text-gray-500">Gestionar categorías</div>
+      </a>
+
+      <!-- Pedidos -->
+      <a href="/admin/pedidos" class="block border rounded-lg p-4 hover:shadow">
+        <div class="text-sm font-medium">Pedidos</div>
+        <div class="text-xs text-gray-500">Listar y gestionar pedidos</div>
+      </a>
+      <a href="/admin/pedidos/nuevo" class="block border rounded-lg p-4 hover:shadow">
+        <div class="text-sm font-medium">Nuevo pedido</div>
+        <div class="text-xs text-gray-500">Crear pedido manual</div>
+      </a>
+    </div>
+  </div>
+{% endblock %}

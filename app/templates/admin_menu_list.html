@@ -1,0 +1,84 @@
+{% extends "base_admin.html" %}
+{% block title %}Menú e-commerce{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto p-6 space-y-6">
+  <div class="flex items-center justify-between">
+    <h1 class="text-2xl font-semibold">Menú e-commerce</h1>
+    <a href="/admin/menu/nuevo?menu=header"
+       class="px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white border border-green-600">
+      Nuevo
+    </a>
+  </div>
+
+  {% if ok %}
+    <div class="p-3 rounded border border-green-200 bg-green-50 text-green-700 text-sm">Acción: {{ ok }}</div>
+  {% elif err %}
+    <div class="p-3 rounded border border-red-200 bg-red-50 text-red-700 text-sm">Error: {{ err }}</div>
+  {% endif %}
+
+  {% if grouped and grouped|length > 0 %}
+    {% for menu, items in grouped.items() %}
+      <section class="bg-white border rounded-xl p-5">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-medium capitalize">{{ menu }}</h2>
+          <a href="/admin/menu/nuevo?menu={{ menu }}"
+             class="text-sm px-3 py-1.5 rounded bg-slate-800 text-white">Agregar</a>
+        </div>
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-slate-600">
+              <th class="py-2">Etiqueta</th>
+              <th class="py-2">Tipo</th>
+              <th class="py-2">Destino</th>
+              <th class="py-2">Parent</th>
+              <th class="py-2 w-16 text-right">Orden</th>
+              <th class="py-2 w-16 text-center">Visible</th>
+              <th class="py-2 w-32"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for it in items %}
+            <tr class="border-t">
+              <td class="py-2">
+                <div class="flex items-center">
+                  <span aria-hidden="true" class="inline-block" style="width: {{ (it.depth or 0) * 16 }}px"></span>
+                  <span class="{{ 'font-medium' if not it.parent_id else '' }}">{{ it.label }}</span>
+                </div>
+              </td>
+              <td class="py-2">{{ it.tipo }}</td>
+              <td class="py-2">
+                {% if it.tipo == 'url' %}
+                    <span class="text-slate-600">{{ it.url or '—' }}</span>
+                {% elif it.tipo == 'categoria' %}
+                    <span class="text-slate-600">Categoría: {{ it.categoria_nombre or ('#' ~ it.categoria_id) }}</span>
+                {% else %}
+                    <span class="text-slate-600">Subcategoría: {{ it.subcategoria_nombre or ('#' ~ it.subcategoria_id) }}</span>
+                {% endif %}
+              </td>
+              <td class="py-2">{{ it.parent_label or '—' }}</td>
+              <td class="py-2 text-right">{{ it.orden }}</td>
+              <td class="py-2 text-center">{{ 'Sí' if it.visible else 'No' }}</td>
+              <td class="py-2 text-right">
+                <a class="text-slate-700 hover:underline" href="/admin/menu/{{ it.id_item }}/editar">Editar</a>
+                <form method="post" action="/admin/menu/{{ it.id_item }}/eliminar" class="inline"
+                      onsubmit="return confirm('¿Eliminar este ítem y sus hijos?');">
+                  <button class="ml-3 text-red-600 hover:underline" type="submit">Eliminar</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+    {% endfor %}
+  {% else %}
+    <div class="bg-white border rounded-xl p-6 flex items-center justify-between">
+      <div class="text-slate-700">No hay ítems de menú aún.</div>
+      <a href="/admin/menu/nuevo?menu=header"
+         class="px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white border border-green-600">
+        Crear primer ítem
+      </a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

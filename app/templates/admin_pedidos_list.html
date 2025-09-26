@@ -1,0 +1,316 @@
+{% extends "base_admin.html" %}
+{% block title %}Pedidos · Admin{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto p-6">
+  <div class="flex items-center justify-between mb-5">
+    <h1 class="text-2xl font-semibold">Pedidos</h1>
+    <div class="flex gap-2">
+      <a href="/admin/pedidos/nuevo" class="px-3 py-2 bg-green-600 text-white rounded-lg">Nuevo pedido</a>
+      <button id="btnVerFlujo" class="px-3 py-2 border rounded-lg">Ver diagrama</button>
+    </div>
+  </div>
+
+  {# --- Flash de éxito (cuando ?ok=created&n=PED-...) --- #}
+  {% if flash_success %}
+    <div class="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-green-700">
+      {{ flash_success }}
+    </div>
+  {% endif %}
+
+  <!-- Filtros -->
+  <form method="get" class="bg-white border rounded-xl p-4 mb-4 grid grid-cols-2 md:grid-cols-6 gap-3">
+    <input name="q" value="{{ request.query_params.get('q','') }}" placeholder="Buscar Nº, cliente..."
+           class="col-span-2 md:col-span-2 border rounded-lg px-3 py-2">
+    <select name="estado" class="border rounded-lg px-3 py-2">
+      <option value="">Todos los estados</option>
+      {% for e in estados or [] %}
+        <option value="{{ e.codigo }}" {{ 'selected' if request.query_params.get('estado')==e.codigo else '' }}>
+          {{ e.nombre }}
+        </option>
+      {% endfor %}
+    </select>
+    <select name="canal" class="border rounded-lg px-3 py-2">
+      <option value="">Todos los canales</option>
+      <option value="manual" {{ 'selected' if request.query_params.get('canal')=='manual' else '' }}>Manual</option>
+      <option value="web" {{ 'selected' if request.query_params.get('canal')=='web' else '' }}>Web</option>
+    </select>
+    <input type="date" name="desde" value="{{ request.query_params.get('desde','') }}" class="border rounded-lg px-3 py-2">
+    <input type="date" name="hasta" value="{{ request.query_params.get('hasta','') }}" class="border rounded-lg px-3 py-2">
+    <button class="px-3 py-2 border rounded-lg">Filtrar</button>
+  </form>
+
+  <!-- Tabla -->
+  <div class="bg-white border rounded-xl overflow-x-auto">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-3 py-2 text-left">Nº</th>
+          <th class="px-3 py-2 text-left">Fecha</th>
+          <th class="px-3 py-2 text-left">Cliente</th>
+          <th class="px-3 py-2 text-left">Estado</th>
+          <th class="px-3 py-2 text-right w-36">Total</th>
+          <th class="px-3 py-2 text-left">Última nota</th>
+          <th class="px-3 py-2 text-center">Canal</th>
+          <th class="px-3 py-2"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr class="border-t" data-id="{{ r.id_pedido }}" data-estado="{{ r.estado_codigo }}">
+          <td class="px-3 py-2 font-medium">
+            <a href="/admin/pedidos/{{ r.id_pedido }}" class="hover:underline">{{ r.numero }}</a>
+          </td>
+          <td class="px-3 py-2 text-slate-600">
+            {% if r.creado_en %}
+              {{ r.creado_en.strftime('%Y-%m-%d %H:%M') if r.creado_en.__class__.__name__ != 'str' else r.creado_en }}
+            {% else %}—{% endif %}
+          </td>
+          <td class="px-3 py-2">{{ r.cliente_nombre if r.cliente_nombre is defined else '—' }}</td>
+          <td class="px-3 py-2">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                  data-badge-estado="{{ r.estado_codigo }}">{{ r.estado_nombre or r.estado_codigo }}</span>
+          </td>
+          <td class="px-3 py-2 text-right whitespace-nowrap">
+            <span data-money="{{ r.total_neto or 0 }}"></span>
+          </td>
+          <td class="px-3 py-2 text-slate-600">
+            {% if r.ultima_nota %}
+              <span class="inline-flex items-center gap-2">
+                <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                  {% if r.ultima_audiencia == 'NEXT_ROLE' %}→ {{ r.ultima_nota_para or 'Rol' }}
+                  {% elif r.ultima_audiencia == 'CUSTOMER' %}Cliente
+                  {% else %}Interno{% endif %}
+                </span>
+                <span class="line-clamp-1">{{ r.ultima_nota }}</span>
+              </span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="px-3 py-2 text-center">
+            <span class="text-xs px-2 py-0.5 rounded-full {{ 'bg-amber-100 text-amber-700' if r.canal=='manual' else 'bg-indigo-100 text-indigo-700' }}">
+              {{ r.canal|capitalize }}
+            </span>
+          </td>
+          <td class="px-3 py-2 text-right">
+            <button class="px-2 py-1 text-sky-700" data-cambiar-estado>Cambiar estado</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td class="px-3 py-4 text-gray-500" colspan="8">No hay pedidos.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal Cambiar Estado -->
+<div id="modalEstado" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/40" data-close-modal></div>
+  <div class="relative z-10 flex min-h-full items-center justify-center p-4">
+    <div class="w-full max-w-lg bg-white border rounded-2xl shadow-2xl overflow-hidden">
+      <div class="px-5 py-4 border-b flex items-center justify-between">
+        <h3 class="font-semibold">Cambiar estado</h3>
+        <button data-close-modal class="p-2 rounded hover:bg-slate-100">&#10005;</button>
+      </div>
+      <div class="p-5 space-y-4">
+        <div>
+          <label class="block text-sm mb-1">Siguiente estado</label>
+          <select id="estadoDestino" class="w-full border rounded-lg px-3 py-2"></select>
+          <p id="ayudaRol" class="text-xs text-slate-500 mt-1">Dirigido a: —</p>
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Nota</label>
+          <textarea id="notaCambio" rows="4" class="w-full border rounded-lg px-3 py-2" placeholder="Instrucciones para el siguiente rol..."></textarea>
+          <p class="text-xs text-slate-500 mt-1">La nota se mostrará destacada al equipo responsable del estado destino.</p>
+        </div>
+        <div>
+          <span class="block text-sm mb-1">Audiencia</span>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+            <label class="border rounded-lg px-3 py-2 flex items-center gap-2">
+              <input type="radio" name="audiencia" value="NEXT_ROLE" checked> Siguiente rol
+            </label>
+            <label class="border rounded-lg px-3 py-2 flex items-center gap-2">
+              <input type="radio" name="audiencia" value="INTERNAL_ALL"> Interno
+            </label>
+            <label class="border rounded-lg px-3 py-2 flex items-center gap-2">
+              <input type="radio" name="audiencia" value="CUSTOMER"> Cliente
+            </label>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button data-close-modal class="px-3 py-2 border rounded-lg">Cancelar</button>
+          <button id="btnGuardarCambio" class="px-3 py-2 bg-green-600 text-white rounded-lg">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Diagrama -->
+<div id="modalFlujo" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/40" data-close-modal></div>
+  <div class="relative z-10 flex min-h-full items-center justify-center p-4">
+    <div class="w-full max-w-3xl bg-white border rounded-2xl shadow-2xl overflow-hidden">
+      <div class="px-5 py-4 border-b flex items-center justify-between">
+        <h3 class="font-semibold">Flujo de estados</h3>
+        <button data-close-modal class="p-2 rounded hover:bg-slate-100">&#10005;</button>
+      </div>
+      <div class="p-5">
+        <div id="mermaidContainer" class="overflow-auto">
+          <div class="text-sm text-slate-500">Cargando diagrama…</div>
+        </div>
+      </div>
+      <div class="px-5 py-3 border-t text-right">
+        <button data-close-modal class="px-3 py-2 border rounded-lg">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Mermaid (para el diagrama) -->
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad:false, theme:"default" });</script>
+
+<script>
+  // Helper: badge por estado
+  const badgeByEstado = (cod) => {
+    const m = {
+      NUEVO: 'bg-blue-100 text-blue-700',
+      APROBADO_QF: 'bg-amber-100 text-amber-800',
+      APROBADO_CRITERIO_QF: 'bg-amber-100 text-amber-800',
+      RECHAZADO_QF: 'bg-rose-100 text-rose-700',
+      EN_PREPARACION: 'bg-indigo-100 text-indigo-700',
+      EN_TRANSITO: 'bg-cyan-100 text-cyan-700',
+      ENTREGADO: 'bg-green-100 text-green-700',
+      RECHAZADO_CLIENTE: 'bg-red-100 text-red-700'
+    };
+    return m[cod] || 'bg-slate-100 text-slate-700';
+  };
+
+  // Formateo CLP
+  const fmtCLP = new Intl.NumberFormat('es-CL', { style:'currency', currency:'CLP', maximumFractionDigits:0 });
+  document.querySelectorAll('[data-money]').forEach(el => {
+    const v = parseInt(el.getAttribute('data-money')||'0', 10);
+    el.textContent = fmtCLP.format(isNaN(v)?0:v);
+  });
+
+  // Pintar badges de estado
+  document.querySelectorAll('[data-badge-estado]').forEach(el => {
+    el.classList.add(...badgeByEstado(el.getAttribute('data-badge-estado')).split(' '));
+  });
+
+  // Modales util
+  const open = (id) => document.getElementById(id).classList.remove('hidden');
+  const closeAll = () => document.querySelectorAll('[data-close-modal]').forEach(btn => {
+    btn.closest('.fixed.inset-0')?.classList.add('hidden');
+  });
+  document.addEventListener('click', (ev) => { if (ev.target.matches('[data-close-modal]')) closeAll(); });
+
+  // Cambiar estado (abrir)
+  let pedidoActual = null;
+  document.addEventListener('click', async (ev) => {
+    const btn = ev.target.closest('[data-cambiar-estado]');
+    if (!btn) return;
+    const tr = btn.closest('tr');
+    const id = tr.getAttribute('data-id');
+    const estado = tr.getAttribute('data-estado');
+    pedidoActual = { id, estado };
+
+    const sel = document.getElementById('estadoDestino');
+    const ayuda = document.getElementById('ayudaRol');
+    sel.innerHTML = '<option>Cargando opciones…</option>';
+    ayuda.textContent = 'Dirigido a: —';
+
+    try {
+      const resp = await fetch(`/admin/pedidos/${id}/siguientes-estados`, { headers: { 'Accept':'application/json' }});
+      const data = await resp.json();
+      if (!data.ok) throw new Error('No fue posible cargar estados.');
+      sel.innerHTML = '';
+      for (const op of data.opciones) {
+        const o = document.createElement('option');
+        o.value = op.codigo;
+        o.textContent = op.nombre;
+        o.dataset.rol = op.rol_destino || '';
+        sel.appendChild(o);
+      }
+      const first = sel.options[0];
+      ayuda.textContent = 'Dirigido a: ' + (first?.dataset.rol || '—');
+    } catch (e) {
+      console.error(e);
+      sel.innerHTML = '<option>No disponible</option>';
+    }
+
+    open('modalEstado');
+  });
+
+  // Cambiar hint de rol al cambiar destino
+  document.getElementById('estadoDestino').addEventListener('change', (e) => {
+    const rol = e.target.selectedOptions[0]?.dataset.rol || '—';
+    document.getElementById('ayudaRol').textContent = 'Dirigido a: ' + rol;
+  });
+
+  // Guardar cambio de estado
+  document.getElementById('btnGuardarCambio').addEventListener('click', async () => {
+    if (!pedidoActual) return;
+    const estado = document.getElementById('estadoDestino').value;
+    const nota = document.getElementById('notaCambio').value.trim();
+    const audiencia = document.querySelector('input[name="audiencia"]:checked')?.value || 'NEXT_ROLE';
+
+    if (['RECHAZADO_QF','RECHAZADO_CLIENTE'].includes(estado) && !nota) {
+      alert('La nota es obligatoria para este cambio de estado.');
+      return;
+    }
+
+    try {
+      const fd = new FormData();
+      fd.append('estado_destino', estado);
+      fd.append('nota', nota);
+      fd.append('audiencia', audiencia);
+
+      const resp = await fetch(`/admin/pedidos/${pedidoActual.id}/cambiar-estado`, { method:'POST', body: fd });
+      const data = await resp.json();
+      if (!data.ok) throw new Error(data.error || 'No fue posible cambiar el estado');
+
+      const tr = document.querySelector(`tr[data-id="${pedidoActual.id}"]`);
+      tr.setAttribute('data-estado', data.estado_actual.codigo);
+      const badge = tr.querySelector('[data-badge-estado]');
+      badge.textContent = data.estado_actual.nombre;
+      badge.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ' + badgeByEstado(data.estado_actual.codigo);
+
+      if (data.ultima_nota) {
+        tr.querySelector('td:nth-child(6)').innerHTML =
+          `<span class="inline-flex items-center gap-2">
+             <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+               ${data.ultima_nota.audiencia==='NEXT_ROLE' ? '→ '+(data.ultima_nota.destinatario_rol||'Rol') :
+                 data.ultima_nota.audiencia==='CUSTOMER' ? 'Cliente' : 'Interno'}
+             </span>
+             <span class="line-clamp-1">${data.ultima_nota.texto}</span>
+           </span>`;
+      }
+
+      closeAll();
+    } catch (e) {
+      alert(e.message || 'Error al guardar');
+    }
+  });
+
+  // Ver diagrama
+  document.getElementById('btnVerFlujo').addEventListener('click', async () => {
+    open('modalFlujo');
+    const cont = document.getElementById('mermaidContainer');
+    cont.innerHTML = '<div class="text-sm text-slate-500">Cargando diagrama…</div>';
+    try {
+      const resp = await fetch('/admin/pedidos/flujo', { headers: { 'Accept':'application/json' }});
+      const data = await resp.json();
+      if (!data.ok || !data.mermaid) throw new Error('Diagrama no disponible');
+      const el = document.createElement('div');
+      el.className = 'mermaid';
+      el.textContent = data.mermaid;
+      cont.innerHTML = '';
+      cont.appendChild(el);
+      mermaid.run({ nodes:[el] });
+    } catch (e) {
+      cont.innerHTML = '<div class="text-sm text-red-600">No fue posible cargar el diagrama.</div>';
+    }
+  });
+</script>
+{% endblock %}

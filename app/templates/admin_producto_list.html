@@ -1,0 +1,88 @@
+{% extends "base_admin.html" %}
+{% block title %}Productos · Admin{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto p-6">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-xl font-semibold">Productos</h1>
+    <div class="flex gap-2">
+      <a href="/admin/productos/carga" class="px-3 py-2 bg-indigo-600 text-white rounded-lg">Carga masiva</a>
+      <a href="/admin/productos/nuevo" class="px-3 py-2 bg-green-600 text-white rounded-lg">Nuevo</a>
+    </div>
+  </div>
+
+  <div class="bg-white border rounded-lg overflow-hidden">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-3 py-2 text-left w-16">Imagen</th>
+          <th class="px-3 py-2 text-left">Título</th>
+          <th class="px-3 py-2 text-left">Subcategoría</th>
+          <th class="px-3 py-2 text-center">Visible</th>
+          <!-- ancho extra + no-wrap -->
+          <th class="px-3 py-2 text-right whitespace-nowrap w-32">Precio</th>
+          <th class="px-3 py-2 text-right">Stock</th>
+          <th class="px-3 py-2"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr class="border-t">
+          <!-- Miniatura -->
+          <td class="px-3 py-2">
+            {% set thumb = r.miniatura_url or r.imagen_principal_url %}
+            {% if thumb %}
+              <img src="{{ thumb }}" alt="miniatura"
+                   class="w-12 h-12 rounded object-cover bg-white border">
+            {% else %}
+              <div class="w-12 h-12 rounded bg-gray-100 border flex items-center justify-center">
+                <svg viewBox="0 0 24 24" class="w-6 h-6 text-gray-400">
+                  <path fill="currentColor" d="M21 19V5a2 2 0 0 0-2-2H5C3.89 3 3 3.9 3 5v14a2 2 0 0 0 2 2h14a 2 2 0 0 0 2-2m-6.5-9.5l3.5 4.5H6l2.5-3l1.5 2l2.5-3z"/>
+                </svg>
+              </div>
+            {% endif %}
+          </td>
+
+          <!-- Título (click a editar) -->
+          <td class="px-3 py-2">
+            <a href="/admin/productos/{{ r.id_producto }}/editar" class="text-slate-800 hover:underline">
+              {{ r.titulo }}
+            </a>
+          </td>
+
+          <!-- Subcategoría -->
+          <td class="px-3 py-2 text-slate-600">
+            {{ r.subcategoria or '—' }}
+          </td>
+
+          <!-- Visible -->
+          <td class="px-3 py-2 text-center">{{ 'Sí' if r.visible_web else 'No' }}</td>
+
+          <!-- Precio (CLP sin decimales) y Stock -->
+          <td class="px-3 py-2 text-right whitespace-nowrap">
+            {% if r.precio_venta is not none and r.precio_venta != 0 %}
+              {% set p = (r.precio_venta | float) %}
+              $ {{ '{:,.0f}'.format(p).replace(',', '.') }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td class="px-3 py-2 text-right">
+            {{ r.stock if r.stock else '—' }}
+          </td>
+
+          <!-- Acciones -->
+          <td class="px-3 py-2 text-right">
+            <a href="/admin/productos/{{ r.id_producto }}/editar"
+               class="px-2 py-1 text-blue-700">Editar</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td class="px-3 py-4 text-gray-500" colspan="7">No hay productos.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,35 @@
+# render.yaml
+services:
+  - type: web
+    name: farmactiva-qa
+    env: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ENV
+        value: "qa"
+      - key: PUBLIC_BASE_URL
+        # cuando Render cree el servicio, cámbiala por la URL real (https://farmactiva-qa.onrender.com)
+        value: "https://farmactiva-qa.onrender.com"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: farmactiva-qa-db
+          property: connectionString
+      - key: MP_ACCESS_TOKEN
+        sync: false        # la ingresarás manualmente como Secret en el panel
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: CORS_ALLOW_ORIGINS
+        value: "https://farmactiva-qa.onrender.com"
+databases:
+  - name: farmactiva-qa-db
+    plan: starter

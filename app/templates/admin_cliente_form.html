@@ -1,0 +1,413 @@
+{% extends "base_admin.html" %}
+{% block title %}{{ 'Editar' if item else 'Nuevo' }} cliente · Admin{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto p-6">
+  <a href="/admin/clientes" class="text-sm text-slate-600 hover:underline">Volver</a>
+  <h1 class="text-2xl font-semibold mt-2">{{ 'Editar' if item else 'Nuevo' }} cliente</h1>
+
+  {% if error %}
+    <div class="mt-4 p-3 rounded bg-red-50 text-red-700 border border-red-200">{{ error }}</div>
+  {% endif %}
+
+  <form method="post"
+        action="{{ '/admin/clientes/' ~ item.id_cliente ~ '/editar' if item else '/admin/clientes/nuevo' }}"
+        class="mt-5 space-y-6 bg-white border rounded-xl p-5">
+
+    <!-- Identidad -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm mb-1">Nombre completo</label>
+        <input name="nombre" required class="w-full border rounded-lg px-3 py-2"
+               value="{{ item.nombre if item else '' }}" placeholder="Ej: Juan Pérez">
+      </div>
+      <div>
+        <label class="block text-sm mb-1">RUT</label>
+        <input id="rut" name="rut" class="w-full border rounded-lg px-3 py-2"
+               value="{{ item.rut if item else '' }}" placeholder="12.345.678-9">
+        <p id="rutHelp" class="text-xs mt-1"></p>
+      </div>
+      <div>
+        <label class="block text-sm mb-1">Email</label>
+        <input type="email" name="email" class="w-full border rounded-lg px-3 py-2"
+               value="{{ item.email if item else '' }}" placeholder="correo@dominio.cl">
+      </div>
+      <div>
+        <label class="block text-sm mb-1">Teléfono</label>
+        <input id="telefono" name="telefono" class="w-full border rounded-lg px-3 py-2"
+               value="{{ item.telefono if item else '' }}" placeholder="+56 9 1234 5678">
+      </div>
+    </div>
+
+    <!-- Direcciones de envío (múltiples) -->
+    <div class="bg-white border rounded-xl p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-medium">Direcciones de envío</h3>
+        {% if item %}
+          <button type="button" id="btnNuevaDir" class="px-3 py-2 border rounded-lg">Nueva dirección</button>
+        {% else %}
+          <span class="text-xs text-slate-500">Guarda el cliente para agregar direcciones.</span>
+        {% endif %}
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-3 py-2">Etiqueta</th>
+              <th class="px-3 py-2">Dirección</th>
+              <th class="px-3 py-2">Comuna</th>
+              <th class="px-3 py-2">Región</th>
+              <th class="px-3 py-2 text-center">Principal</th>
+              <th class="px-3 py-2 text-center">Estado</th>
+              <th class="px-3 py-2 w-36"></th>
+            </tr>
+          </thead>
+          <tbody id="dirBody">
+            {% if not item %}<tr><td colspan="7" class="px-3 py-4 text-slate-500">—</td></tr>{% endif %}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-xs text-slate-500 mt-2">Puedes definir una dirección principal por cliente.</p>
+    </div>
+
+    <!-- Preferencias y estado -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="md:col-span-2">
+        <label class="block text-sm mb-1">Notas internas</label>
+        <textarea name="notas" rows="3" class="w-full border rounded-lg px-3 py-2"
+                  placeholder="Observaciones relevantes para el equipo (no visible al cliente)">{{ item.notas if item else '' }}</textarea>
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="inline-flex items-center gap-2 text-sm">
+          <input type="checkbox" name="acepta_marketing" value="true" {% if item and item.acepta_marketing %}checked{% endif %}>
+          Acepta comunicaciones
+        </label>
+        <label class="inline-flex items-center gap-2 text-sm">
+          <input type="checkbox" name="activo" value="true" {% if not item or item.activo %}checked{% endif %}>
+          Activo
+        </label>
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-3">
+      <a href="/admin/clientes" class="px-3 py-2 border rounded-lg">Cancelar</a>
+      <button class="px-3 py-2 bg-green-600 text-white rounded-lg">Guardar</button>
+    </div>
+  </form>
+</div>
+
+<!-- Modal Crear/Editar Dirección -->
+<div id="dirModal" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/30" data-dir-close></div>
+  <div class="relative z-10 flex min-h-full items-start sm:items-center justify-center p-4">
+    <div class="w-full max-w-lg bg-white border rounded-xl shadow-xl flex flex-col max-h-screen sm:h-5/6 overflow-hidden">
+      <div class="px-4 py-3 border-b flex items-center justify-between">
+        <h3 id="dirModalTitle" class="font-medium">Dirección</h3>
+        <button class="text-slate-600 hover:text-slate-800" title="Cerrar" data-dir-close>&#10005;</button>
+      </div>
+
+      <form id="dirForm" class="flex-1 overflow-y-auto p-4 space-y-3">
+        <input type="hidden" name="id_direccion" id="dir_id">
+        <div>
+          <label class="block text-sm mb-1">Etiqueta (opcional)</label>
+          <input type="text" name="etiqueta" id="dir_etiqueta" class="w-full border rounded-lg px-3 py-2" placeholder="Casa, Trabajo…">
+        </div>
+
+        <div>
+          <label class="block text-sm mb-1">Calle y número</label>
+          <input type="text" name="calle_numero" id="dir_calle" required class="w-full border rounded-lg px-3 py-2">
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm mb-1">Depto (opcional)</label>
+            <input type="text" name="depto" id="dir_depto" class="w-full border rounded-lg px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm mb-1">Referencia (opcional)</label>
+            <input type="text" name="referencia" id="dir_referencia" class="w-full border rounded-lg px-3 py-2">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm mb-1">Región</label>
+            <select id="dir_region" name="id_region" required class="w-full border rounded-lg px-3 py-2"></select>
+          </div>
+          <div>
+            <label class="block text-sm mb-1">Comuna</label>
+            <select id="dir_comuna" name="id_comuna" required class="w-full border rounded-lg px-3 py-2" disabled></select>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-6 pt-1">
+          <label class="inline-flex items-center gap-2">
+            <input type="checkbox" name="es_principal" id="dir_principal" value="true">
+            <span class="text-sm">Definir como principal</span>
+          </label>
+          <label class="inline-flex items-center gap-2">
+            <input type="checkbox" name="activo" id="dir_activo" value="true" checked>
+            <span class="text-sm">Activo</span>
+          </label>
+        </div>
+      </form>
+
+      <div class="px-4 py-3 border-t text-right bg-white">
+        <button class="px-3 py-2 border rounded-lg mr-2" data-dir-close>Cancelar</button>
+        <button id="dirSave" class="px-3 py-2 bg-green-600 text-white rounded-lg">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% block scripts %}
+<script>
+  // ---- Normalización teléfono (+56) ----
+  (function(){
+    const tel = document.getElementById('telefono');
+    if (!tel) return;
+    tel.addEventListener('blur', () => {
+      let t = (tel.value || '').replace(/[^\d]/g,'');
+      if (!t) return;
+      if (t.startsWith('56')) t = t;
+      else if (t.startsWith('0')) t = '56' + t.slice(1);
+      else t = '56' + t;
+      if (t.length >= 11) {
+        tel.value = '+56 ' + t.slice(2,3) + ' ' + t.slice(3,7) + ' ' + t.slice(7,11);
+      } else {
+        tel.value = '+' + t;
+      }
+    });
+  })();
+
+  // ---- Validador de RUT (Chile) ----
+  (function(){
+    const $rut = document.getElementById('rut');
+    const $help = document.getElementById('rutHelp');
+    if (!$rut) return;
+
+    const clean = s => (s||'').toUpperCase().replace(/[^0-9K]/g,'');
+    const dv = n => {
+      let M=0,S=1; for(;n;n=Math.floor(n/10)) S=(S+n%10*(9-M++%6))%11;
+      return S? String(S-1) : 'K';
+    };
+    const format = s => {
+      s = (s||'').toUpperCase().replace(/[^0-9K\-\.]/g,'').replace(/\./g,'').replace(/-/g,'');
+      if (!s) return '';
+      const body = s.slice(0,-1), d = s.slice(-1);
+      let f = '', r = body.split('').reverse().join('');
+      for (let i=0;i<r.length;i++){ f += r[i] + (i%3===2 && i<r.length-1 ? '.' : ''); }
+      return f.split('').reverse().join('') + '-' + d;
+    };
+
+    const validate = () => {
+      const raw = clean($rut.value);
+      if (!raw) { $help.textContent=''; $rut.classList.remove('border-red-400','border-green-400'); return; }
+      if (raw.length < 2) { $help.textContent=''; return; }
+      const body = raw.slice(0,-1), d = raw.slice(-1);
+      const ok = dv(parseInt(body,10)) === d;
+      $rut.value = format(raw);
+      $help.textContent = ok ? 'RUT válido' : 'RUT inválido';
+      $help.className = 'text-xs mt-1 ' + (ok ? 'text-green-600' : 'text-red-600');
+      $rut.classList.toggle('border-green-400', ok);
+      $rut.classList.toggle('border-red-400', !ok);
+    };
+
+    $rut.addEventListener('blur', validate);
+    $rut.addEventListener('change', validate);
+  })();
+
+  // ---- Direcciones (solo en modo edición, requiere item.id_cliente) ----
+  {% if item %}
+  (() => {
+    const clienteId = {{ item.id_cliente }};
+    const $body = document.getElementById('dirBody');
+    const $modal = document.getElementById('dirModal');
+    const $title = document.getElementById('dirModalTitle');
+    const $form  = document.getElementById('dirForm');
+    const $btnNew = document.getElementById('btnNuevaDir');
+    const $btnSave = document.getElementById('dirSave');
+
+    const $id    = document.getElementById('dir_id');
+    const $etq   = document.getElementById('dir_etiqueta');
+    const $calle = document.getElementById('dir_calle');
+    const $depto = document.getElementById('dir_depto');
+    const $ref   = document.getElementById('dir_referencia');
+    const $reg   = document.getElementById('dir_region');
+    const $com   = document.getElementById('dir_comuna');
+    const $prin  = document.getElementById('dir_principal');
+    const $act   = document.getElementById('dir_activo');
+
+    const open = () => $modal.classList.remove('hidden');
+    const close = () => $modal.classList.add('hidden');
+
+    document.addEventListener('click', (ev) => {
+      if (ev.target.matches('[data-dir-close]')) close();
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') close();
+    });
+
+    async function loadRegiones(selValue){
+      const r = await fetch('/admin/geo/regiones'); const data = await r.json();
+      $reg.innerHTML = '<option value="">— Selecciona —</option>';
+      if (data.ok) {
+        for (const it of data.items) {
+          const opt = document.createElement('option');
+          opt.value = it.id; opt.textContent = it.nombre;
+          if (String(selValue||'') === String(it.id)) opt.selected = true;
+          $reg.appendChild(opt);
+        }
+      }
+    }
+    async function loadComunas(idRegion, selValue){
+      $com.innerHTML = '<option value="">— Selecciona —</option>';
+      $com.disabled = true;
+      if (!idRegion) return;
+      const r = await fetch(`/admin/geo/comunas?id_region=${encodeURIComponent(idRegion)}`); 
+      const data = await r.json();
+      if (data.ok) {
+        for (const it of data.items) {
+          const opt = document.createElement('option');
+          opt.value = it.id; opt.textContent = it.nombre;
+          if (String(selValue||'') === String(it.id)) opt.selected = true;
+          $com.appendChild(opt);
+        }
+        $com.disabled = false;
+      }
+    }
+    $reg.addEventListener('change', () => loadComunas($reg.value, null));
+
+    async function refresh(){
+      const r = await fetch(`/admin/clientes/${clienteId}/direcciones`);
+      const data = await r.json();
+      $body.innerHTML = '';
+      if (!data.ok || !data.items || !data.items.length){
+        $body.innerHTML = '<tr><td colspan="7" class="px-3 py-4 text-slate-500">Sin direcciones.</td></tr>';
+        return;
+      }
+      for (const it of data.items){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="px-3 py-2">${it.etiqueta ?? '—'}</td>
+          <td class="px-3 py-2">${it.calle_numero}${it.depto ? ', ' + it.depto : ''}${it.referencia ? ' ('+it.referencia+')' : ''}</td>
+          <td class="px-3 py-2">${it.comuna ?? '—'}</td>
+          <td class="px-3 py-2">${it.region ?? '—'}</td>
+          <td class="px-3 py-2 text-center">${it.es_principal ? '⭐' : '—'}</td>
+          <td class="px-3 py-2 text-center">${it.activo ? 'Activo' : 'Inactivo'}</td>
+          <td class="px-3 py-2 text-right whitespace-nowrap">
+            <button type="button" class="text-blue-700 mr-2" data-edit>Editar</button>
+            <button type="button" class="text-amber-700 mr-2" data-principal ${it.es_principal?'disabled':''}>Principal</button>
+            <button type="button" class="text-red-700" data-del>Eliminar</button>
+          </td>
+        `;
+        tr.dataset.id = it.id_direccion;
+        tr.dataset.etiqueta = it.etiqueta || '';
+        tr.dataset.calle = it.calle_numero || '';
+        tr.dataset.depto = it.depto || '';
+        tr.dataset.ref = it.referencia || '';
+        tr.dataset.id_region = it.id_region || '';
+        tr.dataset.id_comuna = it.id_comuna || '';
+        tr.dataset.es_principal = it.es_principal ? '1' : '0';
+        tr.dataset.activo = it.activo ? '1' : '0';
+        $body.appendChild(tr);
+      }
+    }
+
+    // Nueva
+    document.getElementById('btnNuevaDir')?.addEventListener('click', async ()=>{
+      $title.textContent = 'Nueva dirección';
+      $id.value = ''; $etq.value=''; $calle.value=''; $depto.value=''; $ref.value='';
+      $prin.checked = false; $act.checked = true;
+      await loadRegiones(null);
+      $com.innerHTML = '<option value="">— Selecciona —</option>'; $com.disabled = true;
+      open();
+    });
+
+    // Guardar (create/edit)
+    document.getElementById('dirSave').addEventListener('click', async () => {
+      const fd = new FormData($form);
+      const isEdit = !!$id.value;
+      const url = isEdit
+        ? `/admin/clientes/direcciones/${encodeURIComponent($id.value)}/editar`
+        : `/admin/clientes/${clienteId}/direcciones`;
+
+      $btnSave.disabled = true;  // evitar dobles clicks
+      try {
+        const resp = await fetch(url, { method: 'POST', body: fd });
+        const data = await resp.json().catch(() => ({}));
+
+        if (!resp.ok || !data.ok) {
+          // muestra mensaje del servidor si viene
+          alert(data.error || 'No fue posible guardar la dirección.');
+          return; // NO cerrar modal ni refrescar en error
+        }
+
+        // éxito
+        close();
+        await refresh();
+      } catch (e) {
+        console.error(e);
+        alert('Error de red al guardar la dirección.');
+      } finally {
+        $btnSave.disabled = false;
+      }
+    });
+
+    // Acciones
+    document.getElementById('dirBody').addEventListener('click', async (ev)=>{
+      const tr = ev.target.closest('tr'); if (!tr) return;
+      const id = tr.dataset.id;
+
+      if (ev.target.matches('[data-edit]')){
+        $title.textContent = 'Editar dirección';
+        $id.value = id;
+        $etq.value = tr.dataset.etiqueta || '';
+        $calle.value = tr.dataset.calle || '';
+        $depto.value = tr.dataset.depto || '';
+        $ref.value   = tr.dataset.ref   || '';
+        $prin.checked = tr.dataset.es_principal === '1';
+        $act.checked  = tr.dataset.activo === '1';
+        await loadRegiones(tr.dataset.id_region || null);
+        await loadComunas(tr.dataset.id_region || null, tr.dataset.id_comuna || null);
+        open();
+        return;
+      }
+
+      if (ev.target.matches('[data-principal]')) {
+        const btn = ev.target;
+        btn.disabled = true;
+        try {
+          const r = await fetch(`/admin/clientes/direcciones/${encodeURIComponent(id)}/principal`, { method:'POST' });
+          const data = await r.json();
+          if (!data.ok) throw new Error(data.error || 'Error');
+          await refresh();
+        } catch (e) {
+          console.error(e);
+          alert('No fue posible marcar como principal.');
+        } finally {
+          btn.disabled = false;
+        }
+        return;
+      }
+
+      if (ev.target.matches('[data-del]')){
+        if (!confirm('¿Eliminar esta dirección?')) return;
+        try{
+          const fd = new FormData(); fd.append('hard','false');
+          const r = await fetch(`/admin/clientes/direcciones/${encodeURIComponent(id)}/eliminar`, { method:'POST', body: fd });
+          const data = await r.json();
+          if (!data.ok) throw new Error(data.error || 'Error');
+          await refresh();
+        }catch(e){ console.error(e); alert('No fue posible eliminar.'); }
+        return;
+      }
+    });
+
+    // Cargar lista al entrar
+    refresh();
+  })();
+  {% endif %}
+</script>
+{% endblock %}
+{% endblock %}

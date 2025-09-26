@@ -1,0 +1,122 @@
+{% extends "base_admin.html" %}
+{% block title %}{{ 'Editar' if item else 'Nueva' }} categoría{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto p-6">
+  <h1 class="text-xl font-semibold mb-4">{{ 'Editar' if item else 'Nueva' }} categoría</h1>
+
+  {% if error %}
+  <div class="mb-4 p-3 rounded bg-red-50 text-red-700 border border-red-200">{{ error }}</div>
+  {% endif %}
+
+  <form method="post"
+        action="{{ '/admin/categorias/' ~ item.id ~ '/editar' if item else '/admin/categorias/nueva' }}"
+        class="bg-white border rounded-lg p-4 space-y-4">
+    <div>
+      <label class="block text-sm mb-1">Nombre</label>
+      <input name="nombre" type="text" required class="w-full border rounded-lg px-3 py-2"
+             value="{{ item.nombre if item else '' }}" placeholder="Dermocosmética">
+    </div>
+
+    <div>
+      <label class="block text-sm mb-1">Slug</label>
+      <input name="slug" type="text" class="w-full border rounded-lg px-3 py-2"
+             value="{{ item.slug if item else '' }}" placeholder="dermocosmetica">
+      <p class="text-xs text-gray-500 mt-1">Si lo dejas vacío, se genera automáticamente desde el nombre.</p>
+    </div>
+
+    <div class="flex gap-3">
+      <div class="flex-1">
+        <label class="block text-sm mb-1">Orden</label>
+        <input name="orden" type="number" class="w-full border rounded-lg px-3 py-2"
+               value="{{ item.orden if item else 0 }}">
+      </div>
+      <div class="flex items-end gap-2">
+        <input id="visible" name="visible" type="checkbox" value="true" {% if item and item.visible %}checked{% endif %}>
+        <label for="visible">Visible</label>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <a href="/admin/categorias" class="px-3 py-2 border rounded-lg">Cancelar</a>
+      <button type="submit" class="px-3 py-2 bg-green-600 text-white rounded-lg">Guardar</button>
+    </div>
+  </form>
+
+  <!-- Tarjeta de Subcategorías (solo en Edición) -->
+  {% if item %}
+  <div class="mt-6 bg-white border rounded-lg p-4">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-base font-semibold">Subcategorías de esta categoría</h2>
+      <button id="btnAddSubcat"
+              type="button"
+              class="px-3 py-1.5 text-sm rounded-lg border bg-slate-50 hover:bg-slate-100">
+        ➕ Nueva
+      </button>
+    </div>
+
+    <ul id="subcatList" class="divide-y">
+      {% if subcategorias and subcategorias|length > 0 %}
+        {% for sc in subcategorias %}
+          <li class="py-2 flex items-center justify-between">
+            <div>
+              <div class="font-medium">{{ sc.nombre }}</div>
+              <div class="text-xs text-slate-500">Slug: {{ sc.slug }} · {{ 'Activa' if sc.activo else 'Inactiva' }}</div>
+            </div>
+            <!-- (Opcional) botones futuros: activar/desactivar / eliminar -->
+          </li>
+        {% endfor %}
+      {% else %}
+        <li class="py-4 text-sm text-slate-500">No hay subcategorías para esta categoría.</li>
+      {% endif %}
+    </ul>
+  </div>
+  {% else %}
+  <div class="mt-6 bg-white border rounded-lg p-4">
+    <h2 class="text-base font-semibold mb-1">Subcategorías</h2>
+    <p class="text-sm text-slate-600">
+      Primero guarda la categoría. Luego podrás crear y administrar sus subcategorías aquí.
+    </p>
+  </div>
+  {% endif %}
+</div>
+
+{% if item %}
+<script>
+  // Crear subcategoría con prompt simple y refrescar la lista
+  document.getElementById('btnAddSubcat')?.addEventListener('click', async () => {
+    const nombre = prompt('Nombre de la nueva subcategoría:');
+    if (!nombre) return;
+
+    const form = new FormData();
+    form.append('nombre', nombre);
+
+    try {
+      const resp = await fetch('/admin/categorias/{{ item.id }}/subcategorias/nueva', {
+        method: 'POST',
+        body: form
+      });
+      const data = await resp.json();
+      if (!data.ok) {
+        alert(data.error || 'No fue posible crear la subcategoría.');
+        return;
+      }
+      // Añadir/Refrescar lista sin recargar
+      const li = document.createElement('li');
+      li.className = 'py-2 flex items-center justify-between';
+      li.innerHTML = `
+        <div>
+          <div class="font-medium">${data.nombre}</div>
+          <div class="text-xs text-slate-500">Slug: ${data.slug} · Activa</div>
+        </div>`;
+      const list = document.getElementById('subcatList');
+      const empty = list.querySelector('li.text-sm.text-slate-500');
+      if (empty) empty.remove();
+      list.appendChild(li);
+    } catch (e) {
+      console.error(e);
+      alert('Error de red al crear la subcategoría.');
+    }
+  });
+</script>
+{% endif %}
+{% endblock %}

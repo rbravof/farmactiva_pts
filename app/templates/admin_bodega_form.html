@@ -1,0 +1,129 @@
+{% extends "base_admin.html" %}
+{% block title %}{{ 'Editar' if item else 'Nueva' }} bodega{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto p-6">
+  <a href="/admin/bodegas" class="text-sm text-slate-600 hover:underline">Volver</a>
+  <h1 class="text-2xl font-semibold mt-2">{{ 'Editar' if item else 'Nueva' }} bodega</h1>
+
+  <form method="post" action="{{ '/admin/bodegas/' ~ item.id_bodega ~ '/editar' if item else '/admin/bodegas/nueva' }}"
+        class="mt-5 space-y-6 bg-white border rounded-xl p-5">
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm mb-1">Nombre</label>
+        <input name="nombre" required class="w-full border rounded-lg px-3 py-2"
+               value="{{ item.nombre if item else '' }}" placeholder="Ej: Casa Matriz">
+      </div>
+      <div>
+        <label class="block text-sm mb-1">Orden</label>
+        <input type="number" name="orden" class="w-full border rounded-lg px-3 py-2"
+               value="{{ item.orden if item else 0 }}">
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm mb-1">Calle y número</label>
+      <input name="calle_numero" class="w-full border rounded-lg px-3 py-2"
+             value="{{ item.calle_numero if item else '' }}" placeholder="Av. Siempre Viva 742">
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-sm mb-1">Región</label>
+        <select id="region" name="id_region" class="w-full border rounded-lg px-3 py-2">
+          <option value="">— Selecciona —</option>
+          {% for r in regiones %}
+            <option value="{{ r.id }}" {% if item and item.id_region==r.id %}selected{% endif %}>{{ r.nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm mb-1">Comuna</label>
+        <select id="comuna" name="id_comuna" class="w-full border rounded-lg px-3 py-2" {% if not comunas %}disabled{% endif %}>
+          <option value="">— Selecciona —</option>
+          {% for c in comunas %}
+            <option value="{{ c.id }}" {% if item and item.id_comuna==c.id %}selected{% endif %}>{{ c.nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm mb-1">Referencia</label>
+        <input name="referencia" class="w-full border rounded-lg px-3 py-2"
+               value="{{ item.referencia if item else '' }}" placeholder="Punto de referencia">
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-sm mb-1">Lat</label>
+        <input name="lat" class="w-full border rounded-lg px-3 py-2"
+               value="{{ item.lat if item and item.lat is not none else '' }}" placeholder="-33.45">
+      </div>
+      <div>
+        <label class="block text-sm mb-1">Lon</label>
+        <input name="lon" class="w-full border rounded-lg px-3 py-2"
+               value="{{ item.lon if item and item.lon is not none else '' }}" placeholder="-70.66">
+      </div>
+      <div class="flex items-end gap-2">
+        <input id="activo" name="activo" type="checkbox" value="true" {% if not item or item.activo %}checked{% endif %}>
+        <label for="activo">Activo</label>
+      </div>
+    </div>
+
+    <div>
+      <h3 class="font-medium mb-2">Encargado</h3>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-sm mb-1">Nombre</label>
+          <input name="encargado_nombre" class="w-full border rounded-lg px-3 py-2"
+                 value="{{ item.encargado_nombre if item else '' }}" placeholder="Nombre encargado">
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Email</label>
+          <input type="email" name="encargado_email" class="w-full border rounded-lg px-3 py-2"
+                 value="{{ item.encargado_email if item else '' }}" placeholder="encargado@dominio.cl">
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Teléfono</label>
+          <input name="encargado_telefono" class="w-full border rounded-lg px-3 py-2"
+                 value="{{ item.encargado_telefono if item else '' }}" placeholder="+56 9 1234 5678">
+        </div>
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-3">
+      <a href="/admin/bodegas" class="px-3 py-2 border rounded-lg">Cancelar</a>
+      <button class="px-3 py-2 bg-green-600 text-white rounded-lg">Guardar</button>
+    </div>
+  </form>
+</div>
+
+{% block scripts %}
+<script>
+  (function(){
+    const $region = document.getElementById('region');
+    const $comuna = document.getElementById('comuna');
+    if (!$region || !$comuna) return;
+
+    async function cargarComunas(idRegion){
+      $comuna.innerHTML = '<option value="">— Selecciona —</option>';
+      $comuna.disabled = true;
+      if (!idRegion) return;
+      try{
+        const res = await fetch(`/admin/geo/comunas?id_region=${encodeURIComponent(idRegion)}`, {headers:{'Accept':'application/json'}});
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.items)){
+          for (const c of data.items){
+            const opt = document.createElement('option');
+            opt.value = c.id; opt.textContent = c.nombre;
+            $comuna.appendChild(opt);
+          }
+          $comuna.disabled = false;
+        }
+      }catch(e){ console.error(e); }
+    }
+    $region.addEventListener('change', ()=> cargarComunas($region.value));
+  })();
+</script>
+{% endblock %}
+{% endblock %}

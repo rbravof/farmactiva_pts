@@ -1,0 +1,723 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contratación Por tu Salud - FarmActiva | Formulario de Registro</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --navy-blue: #1B365D;
+            --farm-green: #28A745;
+        }
+        
+        .bg-navy { background-color: var(--navy-blue); }
+        .text-navy { color: var(--navy-blue); }
+        .border-navy { border-color: var(--navy-blue); }
+        .bg-farm-green { background-color: var(--farm-green); }
+        .text-farm-green { color: var(--farm-green); }
+        .border-farm-green { border-color: var(--farm-green); }
+        
+        .form-transition {
+            transition: all 0.3s ease-in-out;
+        }
+        
+        .slide-in {
+            animation: slideIn 0.5s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .input-focus:focus {
+            border-color: var(--farm-green);
+            box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.1);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--farm-green) 0%, #20A73C 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #20A73C 0%, var(--farm-green) 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+        }
+        
+        .error-message {
+            animation: shake 0.5s ease-in-out;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        
+        .file-upload {
+            border: 2px dashed #cbd5e0;
+            transition: all 0.3s ease;
+        }
+        
+        .file-upload:hover {
+            border-color: var(--farm-green);
+            background-color: rgba(40, 167, 69, 0.05);
+        }
+        
+        .file-upload.drag-over {
+            border-color: var(--farm-green);
+            background-color: rgba(40, 167, 69, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-navy text-white py-8">
+        <div class="container mx-auto px-4 text-center">
+            <h1 class="text-3xl md:text-4xl font-bold mb-3">
+                <i class="fas fa-heartbeat text-farm-green mr-3"></i>
+                Contrata tu beneficio de salud a precio de costo
+            </h1>
+            <p class="text-lg text-gray-200 max-w-2xl mx-auto">
+                Completa el formulario para comenzar a ahorrar en tus medicamentos
+            </p>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        <div class="max-w-2xl mx-auto">
+            <!-- User Type Selection -->
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h2 class="text-2xl font-bold text-navy mb-6 text-center">
+                    <i class="fas fa-user-check text-farm-green mr-2"></i>
+                    Tipo de Contratación
+                </h2>
+                
+                <div class="grid md:grid-cols-2 gap-4">
+                    <button type="button" id="personaBtn" class="user-type-btn p-6 border-2 border-gray-300 rounded-lg text-center hover:border-farm-green hover:bg-green-50 form-transition">
+                        <i class="fas fa-user text-3xl text-navy mb-3"></i>
+                        <h3 class="text-lg font-semibold text-navy">Persona Natural</h3>
+                        <p class="text-gray-600 text-sm mt-2">Para uso personal y familiar</p>
+                    </button>
+                    
+                    <button type="button" id="empresaBtn" class="user-type-btn p-6 border-2 border-gray-300 rounded-lg text-center hover:border-farm-green hover:bg-green-50 form-transition">
+                        <i class="fas fa-building text-3xl text-navy mb-3"></i>
+                        <h3 class="text-lg font-semibold text-navy">Empresa</h3>
+                        <p class="text-gray-600 text-sm mt-2">Beneficio para trabajadores</p>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Registration Form -->
+            <form id="registrationForm" class="bg-white rounded-lg shadow-lg p-6 hidden">
+                <div id="formHeader" class="mb-6 text-center">
+                    <h2 class="text-2xl font-bold text-navy mb-2">
+                        <i id="formIcon" class="text-farm-green mr-2"></i>
+                        <span id="formTitle"></span>
+                    </h2>
+                    <p class="text-gray-600" id="formSubtitle"></p>
+                </div>
+
+                <!-- Persona Natural Form -->
+                <div id="personaForm" class="hidden space-y-4">
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="nombreCompleto" class="block text-sm font-medium text-gray-700 mb-1">
+                                Nombre Completo <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" id="nombreCompleto" name="nombreCompleto" class="w-full px-3 py-2 border border-gray-300 rounded-md input-focus" required>
+                            <div class="error-message text-red-500 text-sm mt-1 hidden" id="errorNombreCompleto"></div>
+                        </div>
+                        
+                        <div>
+                            <label for="rutPersona" class="block text-sm font-medium text-gray-700 mb-1">
+                                RUT <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" id="rutPersona" name="rutPersona" placeholder="12.345.678-9" class="w-full px-3 py-2 border border-gray-300 rounded-md input-focus" required>
+                            <div class="error-message text-red-500 text-sm mt-1 hidden" id="errorRutPersona"></div>
+                        </div>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="emailPersona" class="block text-sm font-medium text-gray-700 mb-1">
+                                Correo Electrónico <span class="text-red-500">*</span>
+                            </label>
+                            <input type="email" id="emailPersona" name="emailPersona" class="w-full px-3 py-2 border border-gray-300 rounded-md input-focus" required>
+                            <div class="error-message text-red-500 text-sm mt-1 hidden" id="errorEmailPersona"></div>
+                        </div>
+                        
+                        <div>
+                            <label for="telefonoPersona" class="block text-sm font-medium text-gray-700 mb-1">
+                                Teléfono <span class="text-red-500">*</span>
+                            </label>
+                            <input type="tel" id="telefonoPersona" name="telefonoPersona" placeholder="+56 9 9228 9839" class="w-full px-3 py-2 border border-gray-300 rounded-md input-focus" required>
+                            <div class="error-message text-red-500 text-sm mt-1 hidden" id="errorTelefonoPersona"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="direccion" class="block text-sm font-medium text-gray-700 mb-1">
+                            Dirección <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" id="direccion" name="direccion" placeholder="Calle, número, depto/casa" class="w-full px-3 py-2 border border-gray-300 rounded-md input-focus" required>
+                        <div class="error-message text-red-500 text-sm mt-1 hidden" id="errorDireccion"></div>
+                    </div>
+
+                    <div>
+                        <label for="comuna" class="block text-sm font-medium text-gray-700 mb-1">
+                            Comuna <span class="text-red-500">*</span>
+                        </label>
+                        <select id="comuna" name="comuna" class="w-full px-3 py-2 border border-gray-300 rounded-md input-focus" required>
+                            <option value="">Selecciona tu comuna</option>
+                            <option value="Cerrillos">Cerrillos</option>
+                            <option value="Cerro Navia">Cerro Navia</option>
+                            <option value="Conchalí">Conchalí</option>
+                            <option value="El Bosque">El Bosque</option>
+                            <option value="Estación Central">Estación Central</option>
+                            <option value="Huechuraba">Huechuraba</option>
+                            <option value="Independencia">Independencia</option>
+                            <option value="La Cisterna">La Cisterna</option>
+                            <option value="La Florida">La Florida</option>
+                            <option value="La Granja">La Granja</option>
+                            <option value="La Pintana">La Pintana</option>
+                            <option value="La Reina">La Reina</option>
+                            <option value="Las Condes">Las Condes</option>
+                            <option value="Lo Barnechea">Lo Barnechea</option>
+                            <option value="Lo Espejo">Lo Espejo</option>
+                            <option value="Lo Prado">Lo Prado</option>
+                            <option value="Macul">Macul</option>
+                            <option value="Maipú">Maipú</option>
+                            <option value="Ñuñoa">Ñuñoa</option>
+                            <option value="Pedro Aguirre Cerda">Pedro Aguirre Cerda</option>
+                            <option value="Peñalolén">Peñalolén</option>
+                            <option value="Providencia">Providencia</option>
+                            <option value="Pudahuel">Pudahuel</option>
+                            <option value="Quilicura">Quilicura</option>
+                            <option value="Quinta Normal">Quinta Normal</option>
+                            <option value="Recoleta">Recoleta</option>
+                            <option value="Renca">Renca</option>
+                            <option value="San Joaquín">San Joaquín</option>
+                            <option value="San Miguel">San Miguel</option>
+                            <option value="San Ramón">San Ramón</option>
+                            <option value="Santiago">Santiago</option>
+                            <option value="Vitacura">Vitacura</option>
+                        </select>
+                        <div class="error-message text-red-500 text-sm mt-1 hidden" id="errorComuna"></div>
+                    </div>
+                </div>
+
+                <!-- Empresa Form -->
+                <div id="empresaForm" class="hidden space-y-4">
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="razonSocial" class="block text-sm font-medium text-gray-700 mb-1">
+                                Razón Social <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" id="razonSocial" name="razonSocial" class="w-full px-3 py-2 border border-gray-300 rounded-md input-focus" required>
+                            <div class="error-message text-red-500 text-sm mt-1 hidden" id="errorRazonSocial"></div>
+                        </div>
+                        
+                        <div>
+                            <label for="rutEmpresa" class="block text-sm font-medium text-gray-700 mb-1">
+                                RUT Empresa <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" id="rutEmpresa" name="rutEmpresa" placeholder="12.345.678-9" class="w-full px-3 py-2 border border-gray-300 rounded-md input-focus" required>
+                            <div class="error-message text-red-500 text-sm mt-1 hidden" id="errorRutEmpresa"></div>
+                        </div>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="nombreRepresentante" class="block text-sm font-medium text-gray-700 mb-1">
+                                Nombre Representante Legal <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" id="nombreRepresentante" name="nombreRepresentante" class="w-full px-3 py-2 border border-gray-300 rounded-md input-focus" required>
+                            <div class="error-message text-red-500 text-sm mt-1 hidden" id="errorNombreRepresentante"></div>
+                        </div>
+                        
+                        <div>
+                            <label for="rutRepresentante" class="block text-sm font-medium text-gray-700 mb-1">
+                                RUT Representante Legal <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" id="rutRepresentante" name="rutRepresentante" placeholder="12.345.678-9" class="w-full px-3 py-2 border border-gray-300 rounded-md input-focus" required>
+                            <div class="error-message text-red-500 text-sm mt-1 hidden" id="errorRutRepresentante"></div>
+                        </div>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="emailEmpresa" class="block text-sm font-medium text-gray-700 mb-1">
+                                Correo de Contacto <span class="text-red-500">*</span>
+                            </label>
+                            <input type="email" id="emailEmpresa" name="emailEmpresa" class="w-full px-3 py-2 border border-gray-300 rounded-md input-focus" required>
+                            <div class="error-message text-red-500 text-sm mt-1 hidden" id="errorEmailEmpresa"></div>
+                        </div>
+                        
+                        <div>
+                            <label for="telefonoEmpresa" class="block text-sm font-medium text-gray-700 mb-1">
+                                Teléfono de Contacto <span class="text-red-500">*</span>
+                            </label>
+                            <input type="tel" id="telefonoEmpresa" name="telefonoEmpresa" placeholder="+56 2 1234 5678" class="w-full px-3 py-2 border border-gray-300 rounded-md input-focus" required>
+                            <div class="error-message text-red-500 text-sm mt-1 hidden" id="errorTelefonoEmpresa"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="archivoTrabajadores" class="block text-sm font-medium text-gray-700 mb-1">
+                            Planilla de Trabajadores (Excel) <span class="text-red-500">*</span>
+                        </label>
+                        <div class="file-upload border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer" id="fileUploadArea">
+                            <input type="file" id="archivoTrabajadores" name="archivoTrabajadores" accept=".xlsx,.xls,.csv" class="hidden" required>
+                            <div id="uploadContent">
+                                <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-3"></i>
+                                <p class="text-gray-600 mb-2">Haz clic o arrastra tu archivo Excel aquí</p>
+                                <p class="text-sm text-gray-500">Formatos: .xlsx, .xls, .csv (máx. 10MB)</p>
+                            </div>
+                            <div id="fileInfo" class="hidden">
+                                <i class="fas fa-file-excel text-4xl text-farm-green mb-3"></i>
+                                <p class="text-navy font-medium" id="fileName"></p>
+                                <p class="text-sm text-gray-500" id="fileSize"></p>
+                                <button type="button" class="text-red-500 hover:text-red-700 mt-2" id="removeFile">
+                                    <i class="fas fa-times"></i> Remover archivo
+                                </button>
+                            </div>
+                        </div>
+                        <div class="error-message text-red-500 text-sm mt-1 hidden" id="errorArchivoTrabajadores"></div>
+                    </div>
+                </div>
+
+                <!-- Terms and Conditions -->
+                <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+                    <label class="flex items-start space-x-3">
+                        <input type="checkbox" id="terminosCondiciones" name="terminosCondiciones" class="mt-1 h-4 w-4 text-farm-green border-gray-300 rounded input-focus" required>
+                        <span class="text-sm text-gray-700">
+                            He leído y acepto los 
+                            <a href="#" class="text-farm-green hover:underline font-medium">Términos y Condiciones</a> 
+                            y la 
+                            <a href="#" class="text-farm-green hover:underline font-medium">Política de Privacidad</a> 
+                            del programa "Por tu Salud" de FarmActiva.
+                            <span class="text-red-500">*</span>
+                        </span>
+                    </label>
+                    <div class="error-message text-red-500 text-sm mt-1 hidden" id="errorTerminos"></div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="mt-8 text-center">
+                    <button type="submit" class="btn-primary text-white px-8 py-4 rounded-lg text-lg font-semibold shadow-lg w-full md:w-auto">
+                        <i class="fas fa-credit-card mr-2"></i>
+                        Ir al pago y activar beneficio
+                    </button>
+                    <p class="text-sm text-gray-500 mt-3">
+                        <i class="fas fa-shield-alt text-farm-green mr-1"></i>
+                        Pago seguro procesado por Flow.cl
+                    </p>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-navy text-white py-8 mt-12">
+        <div class="container mx-auto px-4 text-center">
+            <div class="flex flex-col md:flex-row justify-center items-center space-y-4 md:space-y-0 md:space-x-8">
+                <a href="#" class="hover:text-farm-green form-transition">Términos y Condiciones</a>
+                <span class="hidden md:inline text-gray-400">·</span>
+                <a href="#" class="hover:text-farm-green form-transition">Política de Privacidad</a>
+                <span class="hidden md:inline text-gray-400">·</span>
+                <a href="#" class="hover:text-farm-green form-transition">Volver a página principal</a>
+            </div>
+            <div class="mt-6 text-gray-300">
+                <p>&copy; 2024 FarmActiva. Todos los derechos reservados.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Global variables
+        let selectedUserType = null;
+        
+        // DOM Elements
+        const personaBtn = document.getElementById('personaBtn');
+        const empresaBtn = document.getElementById('empresaBtn');
+        const registrationForm = document.getElementById('registrationForm');
+        const personaForm = document.getElementById('personaForm');
+        const empresaForm = document.getElementById('empresaForm');
+        const formIcon = document.getElementById('formIcon');
+        const formTitle = document.getElementById('formTitle');
+        const formSubtitle = document.getElementById('formSubtitle');
+        
+        // User type selection
+        personaBtn.addEventListener('click', () => selectUserType('persona'));
+        empresaBtn.addEventListener('click', () => selectUserType('empresa'));
+        
+        function selectUserType(type) {
+            selectedUserType = type;
+            
+            // Update button styles
+            document.querySelectorAll('.user-type-btn').forEach(btn => {
+                btn.classList.remove('border-farm-green', 'bg-green-50');
+                btn.classList.add('border-gray-300');
+            });
+            
+            if (type === 'persona') {
+                personaBtn.classList.remove('border-gray-300');
+                personaBtn.classList.add('border-farm-green', 'bg-green-50');
+                
+                formIcon.className = 'fas fa-user text-farm-green mr-2';
+                formTitle.textContent = 'Registro Personal';
+                formSubtitle.textContent = 'Completa tus datos para acceder al beneficio';
+                
+                personaForm.classList.remove('hidden');
+                empresaForm.classList.add('hidden');
+            } else {
+                empresaBtn.classList.remove('border-gray-300');
+                empresaBtn.classList.add('border-farm-green', 'bg-green-50');
+                
+                formIcon.className = 'fas fa-building text-farm-green mr-2';
+                formTitle.textContent = 'Registro Empresarial';
+                formSubtitle.textContent = 'Registra tu empresa para ofrecer este beneficio';
+                
+                empresaForm.classList.remove('hidden');
+                personaForm.classList.add('hidden');
+            }
+            
+            // Show form
+            registrationForm.classList.remove('hidden');
+            registrationForm.classList.add('slide-in');
+            
+            // Scroll to form
+            registrationForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        
+        // RUT validation function
+        function validateRUT(rut) {
+            if (!rut) return false;
+            
+            const cleanRUT = rut.replace(/[.-]/g, '');
+            if (cleanRUT.length < 8 || cleanRUT.length > 9) return false;
+            
+            const body = cleanRUT.slice(0, -1);
+            const dv = cleanRUT.slice(-1).toUpperCase();
+            
+            if (!/^\d+$/.test(body)) return false;
+            
+            let sum = 0;
+            let multiplier = 2;
+            
+            for (let i = body.length - 1; i >= 0; i--) {
+                sum += parseInt(body[i]) * multiplier;
+                multiplier = multiplier === 7 ? 2 : multiplier + 1;
+            }
+            
+            const remainder = sum % 11;
+            const calculatedDV = remainder === 0 ? '0' : remainder === 1 ? 'K' : (11 - remainder).toString();
+            
+            return dv === calculatedDV;
+        }
+        
+        // Format RUT
+        function formatRUT(rut) {
+            const clean = rut.replace(/[^0-9kK]/g, '');
+            if (clean.length <= 1) return clean;
+            
+            const body = clean.slice(0, -1);
+            const dv = clean.slice(-1);
+            
+            let formatted = body.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+            return formatted + '-' + dv;
+        }
+        
+        // Real-time validation
+        function setupValidation() {
+            // RUT formatting and validation
+            const rutInputs = ['rutPersona', 'rutEmpresa', 'rutRepresentante'];
+            rutInputs.forEach(id => {
+                const input = document.getElementById(id);
+                if (input) {
+                    input.addEventListener('input', function() {
+                        this.value = formatRUT(this.value);
+                        validateField(id);
+                    });
+                }
+            });
+            
+            // Phone formatting
+            const phoneInputs = ['telefonoPersona', 'telefonoEmpresa'];
+            phoneInputs.forEach(id => {
+                const input = document.getElementById(id);
+                if (input) {
+                    input.addEventListener('input', function() {
+                        let value = this.value.replace(/\D/g, '');
+                        if (value.startsWith('56')) {
+                            value = '+' + value.slice(0, 10);
+                        } else if (value.startsWith('9')) {
+                            value = '+56 ' + value.slice(0, 9);
+                        } else if (value.length > 0) {
+                            value = '+56 ' + value.slice(0, 9);
+                        }
+                        
+                        // Format with spaces
+                        if (value.length > 3) {
+                            value = value.slice(0, 3) + ' ' + value.slice(3);
+                        }
+                        if (value.length > 6) {
+                            value = value.slice(0, 6) + ' ' + value.slice(6);
+                        }
+                        if (value.length > 11) {
+                            value = value.slice(0, 11) + ' ' + value.slice(11);
+                        }
+                        
+                        this.value = value;
+                        validateField(id);
+                    });
+                }
+            });
+            
+            // General field validation
+            const allInputs = document.querySelectorAll('input[required], select[required]');
+            allInputs.forEach(input => {
+                input.addEventListener('blur', () => validateField(input.id));
+                input.addEventListener('input', () => {
+                    if (input.classList.contains('border-red-500')) {
+                        validateField(input.id);
+                    }
+                });
+            });
+        }
+        
+        function validateField(fieldId) {
+            const field = document.getElementById(fieldId);
+            const errorDiv = document.getElementById('error' + fieldId.charAt(0).toUpperCase() + fieldId.slice(1));
+            
+            if (!field || !errorDiv) return true;
+            
+            let isValid = true;
+            let errorMessage = '';
+            
+            // Required field check
+            if (field.hasAttribute('required') && !field.value.trim()) {
+                isValid = false;
+                errorMessage = 'Este campo es obligatorio';
+            }
+            
+            // Specific validations
+            if (field.value.trim()) {
+                switch (fieldId) {
+                    case 'rutPersona':
+                    case 'rutEmpresa':
+                    case 'rutRepresentante':
+                        if (!validateRUT(field.value)) {
+                            isValid = false;
+                            errorMessage = 'RUT inválido';
+                        }
+                        break;
+                        
+                    case 'emailPersona':
+                    case 'emailEmpresa':
+                        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                        if (!emailRegex.test(field.value)) {
+                            isValid = false;
+                            errorMessage = 'Formato de email inválido';
+                        }
+                        break;
+                        
+                    case 'telefonoPersona':
+                    case 'telefonoEmpresa':
+                        const phoneRegex = /^\+56\s[0-9]\s\d{4}\s\d{4}$/;
+                        if (!phoneRegex.test(field.value)) {
+                            isValid = false;
+                            errorMessage = 'Formato de teléfono inválido';
+                        }
+                        break;
+                        
+                    case 'nombreCompleto':
+                    case 'nombreRepresentante':
+                        if (field.value.trim().length < 3) {
+                            isValid = false;
+                            errorMessage = 'Debe tener al menos 3 caracteres';
+                        }
+                        break;
+                }
+            }
+            
+            // Update UI
+            if (isValid) {
+                field.classList.remove('border-red-500');
+                field.classList.add('border-green-500');
+                errorDiv.classList.add('hidden');
+                errorDiv.textContent = '';
+            } else {
+                field.classList.remove('border-green-500');
+                field.classList.add('border-red-500');
+                errorDiv.classList.remove('hidden');
+                errorDiv.textContent = errorMessage;
+            }
+            
+            return isValid;
+        }
+        
+        // File upload handling
+        function setupFileUpload() {
+            const fileInput = document.getElementById('archivoTrabajadores');
+            const uploadArea = document.getElementById('fileUploadArea');
+            const uploadContent = document.getElementById('uploadContent');
+            const fileInfo = document.getElementById('fileInfo');
+            const fileName = document.getElementById('fileName');
+            const fileSize = document.getElementById('fileSize');
+            const removeBtn = document.getElementById('removeFile');
+            
+            if (!fileInput) return;
+            
+            uploadArea.addEventListener('click', () => fileInput.click());
+            
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('drag-over');
+            });
+            
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('drag-over');
+            });
+            
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('drag-over');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleFileSelect(files[0]);
+                }
+            });
+            
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFileSelect(e.target.files[0]);
+                }
+            });
+            
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                fileInput.value = '';
+                uploadContent.classList.remove('hidden');
+                fileInfo.classList.add('hidden');
+                validateField('archivoTrabajadores');
+            });
+            
+            function handleFileSelect(file) {
+                const validTypes = [
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'application/vnd.ms-excel',
+                    'text/csv'
+                ];
+                
+                if (!validTypes.includes(file.type)) {
+                    alert('Por favor, selecciona un archivo Excel válido (.xlsx, .xls, .csv)');
+                    return;
+                }
+                
+                if (file.size > 10 * 1024 * 1024) {
+                    alert('El archivo es demasiado grande. Máximo 10MB.');
+                    return;
+                }
+                
+                fileName.textContent = file.name;
+                fileSize.textContent = formatFileSize(file.size);
+                uploadContent.classList.add('hidden');
+                fileInfo.classList.remove('hidden');
+                
+                validateField('archivoTrabajadores');
+            }
+            
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+        }
+        
+        // Form submission
+        registrationForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Validate all fields
+            let isFormValid = true;
+            const currentForm = selectedUserType === 'persona' ? personaForm : empresaForm;
+            const inputs = currentForm.querySelectorAll('input[required], select[required]');
+            
+            inputs.forEach(input => {
+                if (!validateField(input.id)) {
+                    isFormValid = false;
+                }
+            });
+            
+            // Validate terms
+            const termsCheckbox = document.getElementById('terminosCondiciones');
+            if (!termsCheckbox.checked) {
+                const errorTerminos = document.getElementById('errorTerminos');
+                errorTerminos.classList.remove('hidden');
+                errorTerminos.textContent = 'Debes aceptar los términos y condiciones';
+                isFormValid = false;
+            } else {
+                const errorTerminos = document.getElementById('errorTerminos');
+                errorTerminos.classList.add('hidden');
+            }
+            
+            if (!isFormValid) {
+                // Scroll to first error
+                const firstError = document.querySelector('.border-red-500');
+                if (firstError) {
+                    firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                return;
+            }
+            
+            // Simulate payment redirect
+            const submitBtn = this.querySelector('button[type="submit"]');
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Redirigiendo a Flow.cl...';
+            submitBtn.disabled = true;
+            
+            setTimeout(() => {
+                // Here you would integrate with Flow.cl
+                alert('Redirigiendo al sistema de pago Flow.cl...\n\n(Esta es una simulación. En producción, aquí se haría la integración real con Flow.cl)');
+                
+                // Reset button
+                submitBtn.innerHTML = '<i class="fas fa-credit-card mr-2"></i>Ir al pago y activar beneficio';
+                submitBtn.disabled = false;
+            }, 2000);
+        });
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            setupValidation();
+            setupFileUpload();
+        });
+    </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"968da75bfac150bd","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.7.0","token":"4edd5f8ec12a48cfa682ab8261b80a79"}' crossorigin="anonymous"></script>
+</body>
+</html>
+    <script id="html_badge_script1">
+        window.__genspark_remove_badge_link = "https://www.genspark.ai/api/html_badge/" +
+            "remove_badge?token=To%2FBnjzloZ3UfQdcSaYfDglx8zCmwqfD4vo%2FKKL9l012l4ciXHNxCq%2FDThivK5sdb9v62Ts9d83oJ6bDOO9fbJKpvOPI6Gbz7rnLh0N2R1WJF6al%2BWHKqb%2FaQ6Ev2boRW7%2BEtDdpOqEmw8Om%2FOo%2B60a%2BrELeQdSHy%2Bsf0BKDPjnlZis%2B%2BMHp01I4tS2bU4AWx10P541ZzsGzR9SfF53v9rxMooitWaiZV6nsqfDPOmBfFOZnQW5qp9KQPuu1Pj1eHKxh9uh%2BflMBcY6ZxO8XgnhiUl5wG5O0hyJoa6bHh2JBAUovi34fEQUZOl%2FQNrhGyIKY4YKSNoSz%2F7LEJVruR4aI2EN0b6OLGu25P9ieKZ4sGP3BbtlHqGgE3%2Bpkdfl%2BXDGk2h9H4u8NKO4%2FGFw8e%2BMGDcPr1iaLIM883jpvfUSeeXZX0Rk%2F3MSAw8TDxak1L%2F6E3qYboHCqfWsJ1e7vP1RnylszaNXiD4t1bFLANesBswem1YEFZ3A6cLN31GphN8Jzk%2BWLvoaSFn9mjgs9GccngdLV5J9a3tpF1DbAgAY%3D";
+        window.__genspark_locale = "en-US";
+        window.__genspark_token = "To/BnjzloZ3UfQdcSaYfDglx8zCmwqfD4vo/KKL9l012l4ciXHNxCq/DThivK5sdb9v62Ts9d83oJ6bDOO9fbJKpvOPI6Gbz7rnLh0N2R1WJF6al+WHKqb/aQ6Ev2boRW7+EtDdpOqEmw8Om/Oo+60a+rELeQdSHy+sf0BKDPjnlZis++MHp01I4tS2bU4AWx10P541ZzsGzR9SfF53v9rxMooitWaiZV6nsqfDPOmBfFOZnQW5qp9KQPuu1Pj1eHKxh9uh+flMBcY6ZxO8XgnhiUl5wG5O0hyJoa6bHh2JBAUovi34fEQUZOl/QNrhGyIKY4YKSNoSz/7LEJVruR4aI2EN0b6OLGu25P9ieKZ4sGP3BbtlHqGgE3+pkdfl+XDGk2h9H4u8NKO4/GFw8e+MGDcPr1iaLIM883jpvfUSeeXZX0Rk/3MSAw8TDxak1L/6E3qYboHCqfWsJ1e7vP1RnylszaNXiD4t1bFLANesBswem1YEFZ3A6cLN31GphN8Jzk+WLvoaSFn9mjgs9GccngdLV5J9a3tpF1DbAgAY=";
+    </script>
+    
+        <script id="html_badge_script2" src="https://www.genspark.ai/html_badge.js"></script>
+        
+    <script id="html_notice_dialog_script" src="https://www.genspark.ai/notice_dialog.js"></script>
+    

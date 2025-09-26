@@ -1,0 +1,831 @@
+{% extends "base_admin.html" %}
+{% block title %}Pedido #{{ header.numero or header.id_pedido }}{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto p-6 space-y-4">
+
+  <!-- Volver -->
+  <a href="/admin/pedidos" class="text-sm text-slate-600 hover:underline">Volver</a>
+
+  <style>
+    /* Refuerzo para evitar overrides que lo dejen “blanco” */
+    #btn-save-estado {
+      background-color: #059669 !important;   /* emerald-600 */
+      border-color:     #047857 !important;   /* emerald-700 */
+      color: #fff !important;
+    }
+    #btn-save-estado:hover {
+      background-color: #047857 !important;   /* emerald-700 */
+    }
+    #btn-save-estado[disabled]{
+      background-color: #10b981 !important;   /* emerald-500 */
+      border-color:     #059669 !important;   /* emerald-600 */
+      opacity: .85;
+      cursor: not-allowed;
+    }
+      /* Anti-override: evita que otros estilos de botones lo dejen blanco */
+    #btn-pay-manual{
+      background-color:#059669 !important;  /* emerald-600 */
+      border-color:#047857 !important;      /* emerald-700 */
+      color:#fff !important;
+    }
+    #btn-pay-manual:hover{ background-color:#047857 !important; }
+  </style>
+
+  <!-- Encabezado tipo Shopify -->
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="space-y-1">
+      <h1 class="text-2xl font-semibold">#{{ header.numero or header.id_pedido }}</h1>
+      <div class="text-sm text-slate-500">
+        {{ header.creado_en or '' }} · {{ header.canal or 'Online' }}
+      </div>
+      <div class="flex gap-2 mt-1">
+        {% set pago_ok = ((header.get('pago_estado') or '')|lower in ['pagado','paid','approved']) %}
+        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
+                     {{ 'bg-emerald-50 text-emerald-700 border border-emerald-200' if pago_ok else 'bg-amber-50 text-amber-700 border border-amber-200' }}">
+          {{ 'Pagado' if pago_ok else 'No pagado' }}
+        </span>
+        {% set estado = (header.get('estado_codigo') or 'NUEVO') %}
+        <span id="badge-estado"
+              data-estado="{{ estado }}"
+              class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
+                    border bg-green-50 text-green-700 border-green-200"
+              style="background-color:#ECFDF5; color:#166534; border-color:#BBF7D0;">
+          {{ estado.replace('_',' ')|title }}
+        </span>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap gap-2 items-center">
+      <button class="px-3 py-2 border rounded-lg text-slate-700 cursor-not-allowed opacity-60" disabled>Reembolsar</button>
+      <button class="px-3 py-2 border rounded-lg text-slate-700 cursor-not-allowed opacity-60" disabled>Editar</button>
+
+      <!-- Menú: Más acciones -->
+      <div class="relative" id="actions-dropdown">
+        <button id="btn-more-actions"
+                class="px-3 py-2 rounded-lg border bg-white hover:bg-slate-50 text-slate-800">
+          Más acciones ▾
+        </button>
+        <div id="menu-more-actions"
+             class="hidden absolute right-0 mt-2 w-56 bg-white border rounded-xl shadow-lg z-20">
+          <button type="button" id="act-imprimir"
+                  class="w-full text-left px-3 py-2 hover:bg-slate-50">Imprimir Etiqueta</button>
+          <button type="button" id="act-estado"
+                  class="w-full text-left px-3 py-2 hover:bg-slate-50">Cambiar Estado</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Grid principal: 8/4 -->
+  <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+
+    <!-- Columna izquierda -->
+    <div class="md:col-span-8 space-y-6">
+
+      {# --- Ítems del pedido --- #}
+      <section class="bg-white border rounded-xl">
+        <div class="px-5 py-3 border-b">
+          <h2 class="font-medium">Artículos</h2>
+        </div>
+
+        <div class="p-5 overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-slate-600">
+                <th class="py-2">Artículo</th>
+                <th class="py-2 w-24 text-right">Precio</th>
+                <th class="py-2 w-16 text-right">Cant.</th>
+                <th class="py-2 w-28 text-right">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% set ns = namespace(subtotal=0) %}
+              {% for it in items %}
+                {% set ns.subtotal = ns.subtotal + (it.subtotal or 0) %}
+                <tr class="border-t align-top">
+                  <td class="py-3">
+                    <div class="flex gap-3">
+                      <img src="{{ it.imagen_principal_url or '/static/images/placeholder.png' }}"
+                          alt="" class="w-12 h-12 rounded border object-cover">
+                      <div>
+                        <div class="font-medium text-slate-800">
+                          {{ it.display_nombre_producto or ('Producto #' ~ it.id_producto) }}
+                        </div>
+                        <div class="text-xs text-slate-500">ID {{ it.id_producto }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="py-3 text-right">{{ (it.precio_unitario or 0) | int }}</td>
+                  <td class="py-3 text-right">{{ it.cantidad or 1 }}</td>
+                  <td class="py-3 text-right">{{ (it.subtotal or 0) | int }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+
+          <!-- Totales -->
+          <div class="mt-4 flex flex-col items-end gap-1 text-sm">
+            <div class="flex justify-end w-full max-w-sm">
+              <span class="flex-1 text-right pr-4 text-slate-600">Subtotal artículos</span>
+              <span class="w-32 text-right">{{ ns.subtotal | int }}</span>
+            </div>
+            <div class="flex justify-end w-full max-w-sm">
+              <span class="flex-1 text-right pr-4 text-slate-600">Envío</span>
+              <span class="w-32 text-right">{{ (header.costo_envio or 0) | int }}</span>
+            </div>
+            <div class="flex justify-end w-full max-w-sm font-semibold">
+              <span class="flex-1 text-right pr-4">Total</span>
+              <span class="w-32 text-right">{{ (header.total_neto or (ns.subtotal + (header.costo_envio or 0))) | int }}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Pago -->
+      <section class="bg-white border rounded-xl">
+        <div class="px-5 py-3 border-b flex items-center justify-between">
+          <h2 class="font-medium">Pago</h2>
+
+          {% set _pago_estado = (header.get('pago_estado') or '')|lower %}
+          {% set is_paid = _pago_estado in ['pagado','paid','approved'] %}
+          {% if not is_paid %}
+            <div class="flex gap-2">
+              <button id="btn-pay-email"
+                      type="button"
+                      class="px-3 py-2 rounded-lg border bg-white hover:bg-slate-50 text-slate-800">
+                Solicitar pago por correo
+              </button>
+              <!-- 👇 botón verde con refuerzo anti-override -->
+              <button id="btn-pay-manual"
+                      type="button"
+                      class="px-3 py-2 rounded-lg text-white bg-emerald-600 hover:bg-emerald-700
+                            border border-emerald-700 shadow-sm hover:shadow"
+                      style="background-color:#059669; border-color:#047857; color:#ffffff;">
+                Marcar como pagado
+              </button>
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="p-5 space-y-3 text-sm">
+          <div class="flex justify-between">
+            <span class="text-slate-600">Estado</span>
+            <span class="font-medium">{{ header.get('pago_estado') or '—' }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-600">Proveedor</span>
+            <span class="font-medium">{{ header.get('pago_proveedor') or '—' }}</span>
+          </div>
+
+          {% set _pago_monto  = header.get('pago_monto') %}
+          {% set _total_neto  = header.get('total_neto') %}
+          {% set _pago_moneda = header.get('pago_moneda') or 'CLP' %}
+
+          <div class="flex justify-between">
+            <span class="text-slate-600">Monto</span>
+            <span class="font-medium">
+              {{ (_pago_monto if _pago_monto is not none else (_total_neto or 0)) | int }}
+              {{ _pago_moneda }}
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Envío -->
+      <section class="bg-white border rounded-xl">
+        <div class="px-5 py-3 border-b">
+          <h2 class="font-medium">Envío</h2>
+        </div>
+
+        <div class="p-5 text-sm space-y-3">
+          <div class="flex justify-between">
+            <span class="text-slate-600">Tipo de envío</span>
+            <span class="font-medium">{{ header.tipo_envio_nombre or header.id_tipo_envio or '—' }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-600">Costo</span>
+            <span class="font-medium">
+              {{ header.costo_envio if header.costo_envio is not none else '—' }}
+            </span>
+          </div>
+
+          <div class="border-t pt-3"></div>
+
+          {% if envio_dir %}
+            {% set line1 = (envio_dir.calle ~ ' ' ~ (envio_dir.numero or ''))|trim %}
+            {% set line2 = envio_dir.depto %}
+            {% set line3 = ((envio_dir.comuna or '') ~ (', ' if envio_dir.comuna and envio_dir.ciudad else '') ~ (envio_dir.ciudad or ''))|trim %}
+            {% set line4 = ((envio_dir.region or '') ~ ' ' ~ (envio_dir.codigo_postal or ''))|trim %}
+
+            <div class="space-y-0.5">
+              <div class="font-medium">{{ envio_dir.nombre or header.cliente_nombre }}</div>
+              {% if line1 %}<div>{{ line1 }}</div>{% endif %}
+              {% if line2 %}<div>{{ line2 }}</div>{% endif %}
+              {% if line3 %}<div>{{ line3 }}</div>{% endif %}
+              {% if line4 %}<div>{{ line4 }}</div>{% endif %}
+              <div>{{ envio_dir.pais or 'Chile' }}</div>
+              {% if envio_dir.telefono %}<div>Tel: {{ envio_dir.telefono }}</div>{% endif %}
+            </div>
+
+            {% set q = (line1 ~ ', ' ~ line3 ~ ', ' ~ (envio_dir.region or '') )|replace(' ', '+') %}
+            <a class="inline-block mt-2 text-sky-700 hover:underline"
+              href="https://www.google.com/maps/search/?api=1&query={{ q }}"
+              target="_blank" rel="noreferrer">Ver mapa</a>
+          {% else %}
+            <div class="text-slate-500">Sin dirección registrada.</div>
+          {% endif %}
+        </div>
+      </section>
+
+      <!-- Cronología (placeholder) -->
+      <section class="bg-white border rounded-xl">
+        <div class="px-5 py-3 border-b">
+          <h2 class="font-medium">Cronología</h2>
+        </div>
+        <div class="p-5 space-y-3">
+          <div class="text-sm text-slate-500">Aún no hay notas.</div>
+          <div class="flex gap-2">
+            <textarea class="flex-1 border rounded-lg px-3 py-2" placeholder="Deja un comentario…" disabled></textarea>
+            <button class="px-3 py-2 border rounded-lg text-slate-700 cursor-not-allowed opacity-60" disabled>
+              Publicar
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Columna derecha -->
+    <aside class="md:col-span-4 space-y-6">
+
+      <!-- Cliente -->
+      <section class="bg-white border rounded-xl">
+        <div class="px-5 py-3 border-b">
+          <h3 class="font-medium">Cliente</h3>
+        </div>
+        <div class="p-5 text-sm space-y-2">
+          <div class="font-medium text-slate-800">{{ header.cliente_nombre or '—' }}</div>
+          <div class="text-slate-600">{{ header.cliente_email or '—' }}</div>
+          <div class="text-slate-600">{{ header.cliente_telefono or '—' }}</div>
+        </div>
+      </section>
+
+      <!-- Dirección de envío -->
+      <section class="bg-white border rounded-xl">
+        <div class="px-5 py-3 border-b">
+          <h3 class="font-medium">Dirección de envío</h3>
+        </div>
+
+        <div class="p-5 text-sm text-slate-700 space-y-2">
+          {% if envio_dir %}
+            {% set line1 = (envio_dir.calle ~ ' ' ~ (envio_dir.numero or ''))|trim %}
+            {% set line2 = envio_dir.depto %}
+            {% set line3 = ((envio_dir.comuna or '') ~ (', ' if envio_dir.comuna and envio_dir.ciudad else '') ~ (envio_dir.ciudad or ''))|trim %}
+            {% set line4 = ((envio_dir.region or '') ~ ' ' ~ (envio_dir.codigo_postal or ''))|trim %}
+
+            <div class="font-medium">{{ envio_dir.nombre or header.cliente_nombre }}</div>
+            {% if line1 %}<div>{{ line1 }}</div>{% endif %}
+            {% if line2 %}<div>{{ line2 }}</div>{% endif %}
+            {% if line3 %}<div>{{ line3 }}</div>{% endif %}
+            {% if line4 %}<div>{{ line4 }}</div>{% endif %}
+            <div>{{ envio_dir.pais or 'Chile' }}</div>
+            {% if envio_dir.telefono %}<div>Tel: {{ envio_dir.telefono }}</div>{% endif %}
+
+            {% set q = (line1 ~ ', ' ~ line3 ~ ', ' ~ (envio_dir.region or '')) | replace(' ', '+') %}
+            <a class="inline-block mt-2 text-sky-700 hover:underline"
+              href="https://www.google.com/maps/search/?api=1&query={{ q }}"
+              target="_blank" rel="noreferrer">Ver mapa</a>
+          {% else %}
+            <div class="text-slate-500">Sin dirección registrada.</div>
+          {% endif %}
+        </div>
+      </section>
+
+      <!-- Dirección de facturación -->
+      <section class="bg-white border rounded-xl">
+        <div class="px-5 py-3 border-b">
+          <h3 class="font-medium">Dirección de facturación</h3>
+        </div>
+
+        <div class="p-5 text-sm text-slate-700 space-y-2">
+          {% set _fact = fact_dir or envio_dir %}
+          {% if _fact %}
+            {% set f1 = (_fact.calle ~ ' ' ~ (_fact.numero or ''))|trim %}
+            {% set f2 = _fact.depto %}
+            {% set f3 = ((_fact.comuna or '') ~ (', ' if _fact.comuna and _fact.ciudad else '') ~ (_fact.ciudad or ''))|trim %}
+            {% set f4 = ((_fact.region or '') ~ ' ' ~ (_fact.codigo_postal or ''))|trim %}
+
+            <div class="font-medium">{{ _fact.nombre or header.cliente_nombre }}</div>
+            {% if f1 %}<div>{{ f1 }}</div>{% endif %}
+            {% if f2 %}<div>{{ f2 }}</div>{% endif %}
+            {% if f3 %}<div>{{ f3 }}</div>{% endif %}
+            {% if f4 %}<div>{{ f4 }}</div>{% endif %}
+            <div>{{ _fact.pais or 'Chile' }}</div>
+            {% if _fact.telefono %}<div>Tel: {{ _fact.telefono }}</div>{% endif %}
+          {% else %}
+            <div class="text-slate-500">Sin dirección registrada.</div>
+          {% endif %}
+        </div>
+      </section>
+      
+      <!-- Etiquetas (placeholder) -->
+      <section class="bg-white border rounded-xl">
+        <div class="px-5 py-3 border-b">
+          <h3 class="font-medium">Etiquetas</h3>
+        </div>
+        <div class="p-5">
+          <input class="w-full border rounded-lg px-3 py-2 text-sm opacity-60" placeholder="Agregar etiqueta…" disabled>
+        </div>
+      </section>
+
+      <!-- Historial & Notas -->
+      <section class="bg-white border rounded-xl">
+        <div class="px-5 py-3 border-b flex items-center justify-between">
+          <h3 class="font-medium">Historial y notas</h3>
+          <span class="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-700">{{ notas|length }}</span>
+        </div>
+
+        <form method="post" action="/admin/pedidos/{{ header.id_pedido }}/notas/nueva" class="p-5 space-y-3">
+          <textarea name="texto" rows="3" class="w-full border rounded-lg px-3 py-2 text-sm"
+                    placeholder="Escribe una nota para el equipo o para el cliente…" required></textarea>
+
+          <div class="flex items-center gap-3 text-sm">
+            <label class="inline-flex items-center gap-2">
+              <input type="radio" name="audiencia" value="interno" checked>
+              <span>Interna (solo equipo)</span>
+            </label>
+            <label class="inline-flex items-center gap-2">
+              <input type="radio" name="audiencia" value="cliente">
+              <span>Visible al cliente</span>
+            </label>
+
+            <select name="destinatario_rol" class="ml-auto border rounded-lg px-2 py-1">
+              <option value="">— Destinatario (opcional) —</option>
+              <option value="bodega">Bodega</option>
+              <option value="ventas">Ventas</option>
+              <option value="reparto">Reparto</option>
+              <option value="cliente">Cliente</option>
+            </select>
+          </div>
+
+          <div class="flex items-center justify-end">
+            <button class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-sm">
+              Agregar nota
+            </button>
+          </div>
+        </form>
+
+        <div class="px-5 pb-5 space-y-4">
+          {% if notas and notas|length > 0 %}
+            {% for n in notas %}
+              <div class="flex items-start gap-3">
+                <div class="mt-1 w-2 h-2 rounded-full {{ 'bg-emerald-500' if n.audiencia=='cliente' else 'bg-slate-300' }}"></div>
+                <div class="flex-1">
+                  <div class="text-xs text-slate-500">
+                    {{ n.creado_en }} ·
+                    {{ n.autor_nombre or '—' }}
+                    {% if n.autor_rol %}· {{ n.autor_rol }}{% endif %}
+                    {% if n.destinatario_rol %} · → {{ n.destinatario_rol }}{% endif %}
+                    {% if n.audiencia == 'cliente' %}
+                      <span class="ml-1 inline-flex items-center text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5">Cliente</span>
+                    {% else %}
+                      <span class="ml-1 inline-flex items-center text-slate-700 bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5">Interno</span>
+                    {% endif %}
+                  </div>
+                  <div class="mt-1 text-sm text-slate-800 whitespace-pre-line">{{ n.texto }}</div>
+                </div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="text-sm text-slate-500">Sin notas aún.</div>
+          {% endif %}
+        </div>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<!-- Modal: Imprimir Etiqueta -->
+<div id="modal-label" class="hidden fixed inset-0 z-40">
+  <div class="absolute inset-0 bg-black/40" data-close="label"></div>
+  <div class="absolute inset-0 grid place-items-center p-4">
+    <!-- ancho del modal generoso para evitar scroll -->
+    <div class="max-w-full bg-white rounded-2xl shadow-xl border" style="width: 120mm;">
+      <div class="px-4 py-3 border-b flex items-center justify-between">
+        <h3 class="font-medium">Etiqueta de envío</h3>
+        <div class="flex items-center gap-2">
+          <button id="btn-print-label"
+                  class="px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50">Imprimir</button>
+          <button class="px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50" data-close="label">Cerrar</button>
+        </div>
+      </div>
+      <div class="p-3">
+        <!-- Viewport del iframe amplio; el documento interno se autoescala en pantalla -->
+        <iframe id="label-frame"
+                src=""
+                class="block bg-white rounded-lg"
+                style="width: 106mm; height: 80mm; border: 1px solid #e5e7eb;"></iframe>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Cambiar Estado -->
+<div id="modal-estado" class="hidden fixed inset-0 z-40">
+  <div class="absolute inset-0 bg-black/40" data-close="estado"></div>
+  <div class="absolute inset-0 grid place-items-center p-4">
+    <div class="w-[560px] max-w-full bg-white rounded-2xl shadow-xl border">
+      <div class="px-4 py-3 border-b flex items-center justify-between">
+        <h3 class="font-medium">Cambiar estado del pedido</h3>
+        <button class="px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50" data-close="estado">Cerrar</button>
+      </div>
+
+      <form id="form-estado" class="p-4 space-y-4">
+        <!-- Fila 1: Rol destinatario + Nuevo estado -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">          
+          <div>
+            {% if estados and estados|length > 0 %}
+              <label class="block text-sm text-slate-700 mb-1">Nuevo estado</label>
+              <select name="nuevo_estado" class="w-full border rounded-lg px-3 py-2">
+                {% for e in estados %}
+                  <option value="{{ e.codigo }}">{{ e.nombre or e.codigo }}</option>
+                {% endfor %}
+              </select>
+            {% else %}
+              <label class="block text-sm text-slate-700 mb-1">Nuevo estado (código)</label>
+              <input name="nuevo_estado" required class="w-full border rounded-lg px-3 py-2" placeholder="ej: APROBADO_QF">
+            {% endif %}
+          </div>
+          
+          <div>
+            <label class="block text-sm text-slate-700 mb-1">Rol destinatario</label>
+            <select name="destinatario_rol" class="w-full border rounded-lg px-3 py-2">
+              <option value="">— Selecciona rol (opcional) —</option>
+              <option value="bodega">Bodega</option>
+              <option value="ventas">Ventas</option>
+              <option value="reparto">Reparto</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Fila 2: Notas (cliente / rol) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm text-slate-700 mb-1">Nota para el cliente (opcional)</label>
+            <textarea name="nota_cliente" rows="3" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Mensaje visible al cliente…"></textarea>
+          </div>
+          <div>
+            <label class="block text-sm text-slate-700 mb-1">Nota interna para el rol (opcional)</label>
+            <textarea name="nota_rol" rows="3" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Instrucciones para bodega/reparto/ventas…"></textarea>
+          </div>
+        </div>
+
+        <!-- Footer del modal -->
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button type="button"
+                  data-close="estado"
+                  class="px-3 py-2 rounded-lg border bg-white hover:bg-slate-50">
+            Cancelar
+          </button>
+
+          <!-- 👇 Botón de Guardar -->
+          <button
+            id="btn-save-estado"
+            type="submit"
+            class="px-3 py-2 rounded-lg text-white bg-emerald-600 hover:bg-emerald-700
+                  border border-emerald-700 shadow-sm hover:shadow
+                  focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1">
+            Guardar estado
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Safelist anti-purge: mantenemos las clases que se aplican dinámicamente vía JS -->
+<div class="hidden">
+  <span class="bg-green-50 text-green-700 border-green-200"></span>
+  <span class="bg-sky-50 text-sky-700 border-sky-200"></span>
+  <span class="bg-rose-50 text-rose-700 border-rose-200"></span>
+  <span class="bg-amber-50 text-amber-800 border-amber-200"></span>
+  <span class="bg-indigo-50 text-indigo-700 border-indigo-200"></span>
+</div>
+
+<!-- Modal: Solicitar pago por correo -->
+<div id="modal-pay-email" class="hidden fixed inset-0 z-40 flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/30"></div>
+  <div class="relative bg-white w-full max-w-lg rounded-xl border shadow-md z-10">
+    <div class="px-4 py-3 border-b flex items-center justify-between">
+      <h3 class="font-medium">Solicitar pago por correo</h3>
+      <button type="button" data-close="pay-email" class="px-2 py-1 rounded border bg-white">Cerrar</button>
+    </div>
+    <form id="form-pay-email" class="p-4 space-y-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm text-slate-600 mb-1">Email destino</label>
+          <input name="email_to" type="email" required
+                 value="{{ header.cliente_email or '' }}"
+                 class="w-full border rounded-lg px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-sm text-slate-600 mb-1">Monto</label>
+          <input name="monto" type="number" min="0" step="1" required
+                 value="{{ header.total_neto or 0 }}"
+                 class="w-full border rounded-lg px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-sm text-slate-600 mb-1">Moneda</label>
+          <input name="moneda" value="{{ header.pago_moneda or 'CLP' }}"
+                 class="w-full border rounded-lg px-3 py-2">
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm text-slate-600 mb-1">Mensaje (opcional)</label>
+        <textarea name="mensaje" rows="3" class="w-full border rounded-lg px-3 py-2"
+                  placeholder="Instrucciones o un saludo para el cliente…"></textarea>
+      </div>
+      <div class="flex items-center justify-end gap-2">
+        <button type="button" data-close="pay-email"
+                class="px-3 py-2 rounded-lg border bg-white hover:bg-slate-50">Cancelar</button>
+        <button id="btn-send-pay-email" type="submit"
+                class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white">Enviar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Marcar como pagado -->
+<div id="modal-pay-manual" class="hidden fixed inset-0 z-40 flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/30"></div>
+  <div class="relative bg-white w-full max-w-2xl rounded-xl border shadow-md z-10">
+    <div class="px-4 py-3 border-b flex items-center justify-between">
+      <h3 class="font-medium">Marcar pedido como pagado</h3>
+      <button type="button" data-close="pay-manual" class="px-2 py-1 rounded border bg-white">Cerrar</button>
+    </div>
+    <form id="form-pay-manual" class="p-4 space-y-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm text-slate-600 mb-1">Forma de pago</label>
+          <select name="forma_pago" required class="w-full border rounded-lg px-3 py-2">
+            <option value="tarjeta">Tarjeta</option>
+            <option value="transferencia">Transferencia</option>
+            <option value="efectivo">Efectivo</option>
+            <option value="otro">Otro</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-slate-600 mb-1">Medio de pago</label>
+          <select name="medio_pago" required class="w-full border rounded-lg px-3 py-2">
+            <option>Webpay</option>
+            <option>MercadoPago</option>
+            <option>Transferencia</option>
+            <option>Caja/Local</option>
+            <option>Otro</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-slate-600 mb-1">Proveedor (opcional)</label>
+          <input name="proveedor" placeholder="Transbank / Banco / etc."
+                 class="w-full border rounded-lg px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-sm text-slate-600 mb-1">Referencia (opcional)</label>
+          <input name="ref_transaccion" placeholder="N° operación / voucher"
+                 class="w-full border rounded-lg px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-sm text-slate-600 mb-1">Monto</label>
+          <input name="monto" type="number" min="0" step="1" required
+                 value="{{ header.total_neto or 0 }}"
+                 class="w-full border rounded-lg px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-sm text-slate-600 mb-1">Moneda</label>
+          <input name="moneda" value="{{ header.pago_moneda or 'CLP' }}"
+                 class="w-full border rounded-lg px-3 py-2">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm text-slate-600 mb-1">Nota para el cliente (opcional)</label>
+          <textarea name="nota_cliente" rows="3" class="w-full border rounded-lg px-3 py-2"
+                    placeholder="Mensaje visible al cliente…"></textarea>
+        </div>
+        <div>
+          <label class="block text-sm text-slate-600 mb-1">Nota interna para el rol (opcional)</label>
+          <textarea name="nota_interna" rows="3" class="w-full border rounded-lg px-3 py-2"
+                    placeholder="Instrucciones para bodega/reparto/ventas…"></textarea>
+          <div class="mt-2">
+            <label class="block text-sm text-slate-600 mb-1">Rol destinatario (opcional)</label>
+            <select name="destinatario_rol" class="w-full border rounded-lg px-3 py-2">
+              <option value="">— Selecciona rol —</option>
+              <option value="bodega">Bodega</option>
+              <option value="reparto">Reparto</option>
+              <option value="ventas">Ventas</option>
+              <option value="cliente">Cliente</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2">
+        <button type="button" data-close="pay-manual"
+                class="px-3 py-2 rounded-lg border bg-white hover:bg-slate-50">Cancelar</button>
+        <button id="btn-save-pay-manual" type="submit"
+                class="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white">
+          Guardar pago
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(() => {
+  const pedidoId = {{ header.id_pedido|int }};
+  const $menuBtn = document.getElementById('btn-more-actions');
+  const $menu    = document.getElementById('menu-more-actions');
+  const $ddWrap  = document.getElementById('actions-dropdown');
+
+  function toggleMenu(show) { $menu.classList[show ? 'remove' : 'add']('hidden'); }
+
+  $menuBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleMenu($menu.classList.contains('hidden'));
+  });
+  document.addEventListener('click', (e) => {
+    if (!$ddWrap.contains(e.target)) toggleMenu(false);
+  });
+
+  // Modales
+  const modals = {
+    label:     document.getElementById('modal-label'),
+    estado:    document.getElementById('modal-estado'),
+    payEmail:  document.getElementById('modal-pay-email'),
+    payManual: document.getElementById('modal-pay-manual'),
+  };
+  function openModal(name){ console.log('[pedido-actions] open modal:', name); modals[name]?.classList.remove('hidden'); }
+  function closeModal(name){ console.log('[pedido-actions] close modal:', name); modals[name]?.classList.add('hidden'); }
+  document.querySelectorAll('[data-close="label"]').forEach(el => el.addEventListener('click', () => closeModal('label')));
+  document.querySelectorAll('[data-close="estado"]').forEach(el => el.addEventListener('click', () => closeModal('estado')));
+  document.querySelectorAll('[data-close="pay-email"]').forEach(el => el.addEventListener('click', () => closeModal('payEmail')));
+  document.querySelectorAll('[data-close="pay-manual"]').forEach(el => el.addEventListener('click', () => closeModal('payManual')));
+
+  // Etiqueta
+  document.getElementById('act-imprimir')?.addEventListener('click', () => {
+    toggleMenu(false);
+    const $frame = document.getElementById('label-frame');
+    const url = `/admin/pedidos/${pedidoId}/etiqueta`;
+    console.log('[pedido-actions] abrir etiqueta en modal:', url);
+    $frame.src = url;
+    openModal('label');
+  });
+  document.getElementById('btn-print-label')?.addEventListener('click', () => {
+    console.log('[pedido-actions] print etiqueta (iframe)');
+    const f = document.getElementById('label-frame');
+    try { f.contentWindow.focus(); f.contentWindow.print(); }
+    catch (e) { console.error('[pedido-actions] print error', e); }
+  });
+
+  // ===== Estado: helpers UI =====
+  const estadoMap = {
+    'NUEVO': ['bg-green-50','text-green-700','border-green-200'],
+    'APROBADO_QF': ['bg-green-50','text-green-700','border-green-200'],
+    'APROBADO_CRITERIO_QF': ['bg-green-50','text-green-700','border-green-200'],
+    'RECHAZADO_QF': ['bg-rose-50','text-rose-700','border-rose-200'],
+    'PREPARANDO': ['bg-amber-50','text-amber-800','border-amber-200'],
+    'ENVIADO': ['bg-sky-50','text-sky-700','border-sky-200'],
+    'ENTREGADO': ['bg-green-50','text-green-700','border-green-200'],
+    'CANCELADO': ['bg-rose-50','text-rose-700','border-rose-200'],
+  };
+
+  function titleFromCode(code){
+    return (code || 'NUEVO').toString().replace(/_/g,' ').toLowerCase()
+      .replace(/(^|\s)\S/g, s => s.toUpperCase());
+  }
+  function applyEstadoBadge(code){
+    const el = document.getElementById('badge-estado');
+    if (!el) return;
+    // limpiar clases anteriores (todas las bg/text/border conocidas)
+    Object.values(estadoMap).flat().forEach(c => el.classList.remove(c));
+    const cls = estadoMap[(code||'NUEVO').toUpperCase()] || estadoMap['NUEVO'];
+    el.classList.add(...cls);
+    el.dataset.estado = code;
+    el.textContent = titleFromCode(code);
+  }
+  // pintar estado inicial
+  applyEstadoBadge(document.getElementById('badge-estado')?.dataset.estado || 'NUEVO');
+
+  // Abrir modal de estado
+  document.getElementById('act-estado')?.addEventListener('click', () => {
+    toggleMenu(false);
+    openModal('estado');
+  });
+
+  // Guardar estado
+  document.getElementById('form-estado')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    console.log('[pedido-actions] submit cambio estado ->', Object.fromEntries(fd.entries()));
+
+    const btn = document.getElementById('btn-save-estado');
+    if (btn) {
+      btn.setAttribute('disabled', 'true');
+      btn.classList.add('opacity-70','cursor-not-allowed');
+      btn.textContent = 'Guardando…';
+    }
+
+    try {
+      const resp = await fetch(`/admin/pedidos/${pedidoId}/cambiar-estado`, { method: 'POST', body: fd });
+      const json = await resp.json().catch(() => ({}));
+      console.log('[pedido-actions] cambiar-estado resp:', json);
+      if (json.ok) {
+        applyEstadoBadge(json.nuevo_estado);
+        closeModal('estado');
+        // TODO: refrescar contador de notas sin recarga si se desea
+      } else {
+        alert('No se pudo cambiar el estado: ' + (json.error || 'error desconocido'));
+      }
+    } catch (err) {
+      console.error('[pedido-actions] fetch error', err);
+      alert('Error de red al cambiar estado.');
+    } finally {
+      if (btn) {
+        btn.removeAttribute('disabled');
+        btn.classList.remove('opacity-70','cursor-not-allowed');
+        btn.textContent = 'Guardar estado';
+      }
+    }
+  });
+
+  // ===== Pagos (UI) =====
+  // Abrir modales de pago
+  document.getElementById('btn-pay-email')?.addEventListener('click', () => {
+    console.log('[pagos-ui] abrir modal pay-email');
+    openModal('payEmail');
+  });
+  document.getElementById('btn-pay-manual')?.addEventListener('click', () => {
+    console.log('[pagos-ui] abrir modal pay-manual');
+    openModal('payManual');
+  });
+
+  // Enviar solicitud de pago por correo
+  document.getElementById('form-pay-email')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    console.log('[pagos-ui] enviar solicitud ->', Object.fromEntries(fd.entries()));
+    const btn = document.getElementById('btn-send-pay-email');
+    btn?.setAttribute('disabled','true');
+    btn && (btn.textContent = 'Enviando…');
+
+    try {
+      const resp = await fetch(`/admin/pagos/${pedidoId}/enviar-solicitud`, { method: 'POST', body: fd });
+      const json = await resp.json().catch(() => ({}));
+      console.log('[pagos-ui] resp solicitud:', json);
+      if (json.ok) {
+        closeModal('payEmail');
+        alert('Solicitud de pago registrada.');
+      } else {
+        alert('No se pudo enviar: ' + (json.error || 'Error'));
+      }
+    } catch (err) {
+      console.error('[pagos-ui] error', err);
+      alert('Error de red.');
+    } finally {
+      if (btn) { btn.removeAttribute('disabled'); btn.textContent = 'Enviar'; }
+    }
+  });
+
+  // Marcar manualmente como pagado
+  document.getElementById('form-pay-manual')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    console.log('[pagos-ui] marcar pagado ->', Object.fromEntries(fd.entries()));
+    const btn = document.getElementById('btn-save-pay-manual');
+    btn?.setAttribute('disabled','true');
+    btn && (btn.textContent = 'Guardando…');
+
+    try {
+      const resp = await fetch(`/admin/pagos/${pedidoId}/marcar-pagado`, { method: 'POST', body: fd });
+      const json = await resp.json().catch(() => ({}));
+      console.log('[pagos-ui] resp marcar-pagado:', json);
+      if (json.ok) {
+        closeModal('payManual');
+        location.reload();
+      } else {
+        alert('No se pudo guardar: ' + (json.error || 'Error'));
+      }
+    } catch (err) {
+      console.error('[pagos-ui] error', err);
+      alert('Error de red.');
+    } finally {
+      if (btn) { btn.removeAttribute('disabled'); btn.textContent = 'Guardar pago'; }
+    }
+  });
+})();
+</script>
+
+{% endblock %}

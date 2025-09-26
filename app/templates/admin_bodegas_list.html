@@ -1,0 +1,54 @@
+{% extends "base_admin.html" %}
+{% block title %}Bodegas · Admin{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto p-6">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-xl font-semibold">Bodegas</h1>
+    <a href="/admin/bodegas/nueva" class="px-3 py-2 bg-green-600 text-white rounded-lg">Nueva</a>
+  </div>
+
+  <div class="bg-white border rounded-lg overflow-hidden">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-3 py-2 text-left">Nombre</th>
+          <th class="px-3 py-2 text-left">Dirección</th>
+          <th class="px-3 py-2 text-left">Comuna / Región</th>
+          <th class="px-3 py-2 text-left">Encargado</th>
+          <th class="px-3 py-2 text-center w-24">Activo</th>
+          <th class="px-3 py-2 text-right w-56">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr class="border-t">
+          <td class="px-3 py-2 font-medium">{{ r.nombre }}</td>
+          <td class="px-3 py-2">{{ r.calle_numero }}{% if r.referencia %} ({{ r.referencia }}){% endif %}</td>
+          <td class="px-3 py-2">{{ r.comuna or '—' }}{% if r.region %} / {{ r.region }}{% endif %}</td>
+          <td class="px-3 py-2">
+            {{ r.encargado_nombre or '—' }}
+            {% if r.encargado_email %}<div class="text-xs text-slate-500">{{ r.encargado_email }}</div>{% endif %}
+            {% if r.encargado_telefono %}<div class="text-xs text-slate-500">{{ r.encargado_telefono }}</div>{% endif %}
+          </td>
+          <td class="px-3 py-2 text-center">{{ 'Sí' if r.activo else 'No' }}</td>
+          <td class="px-3 py-2 text-right whitespace-nowrap">
+            <form action="/admin/bodegas/{{ r.id_bodega }}/toggle" method="post" class="inline">
+              <button class="px-2 py-1 text-sm {{ 'text-gray-600' if r.activo else 'text-green-700' }}">
+                {{ 'Ocultar' if r.activo else 'Activar' }}
+              </button>
+            </form>
+            <a href="/admin/bodegas/{{ r.id_bodega }}/editar" class="px-2 py-1 text-blue-700">Editar</a>
+            <form action="/admin/bodegas/{{ r.id_bodega }}/eliminar" method="post" class="inline"
+                  onsubmit="return confirm('¿Eliminar esta bodega?');">
+              <button class="px-2 py-1 text-red-700" type="submit">Eliminar</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td class="px-3 py-4 text-gray-500" colspan="6">No hay bodegas.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

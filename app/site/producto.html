@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <title>FarmActiva — Detalle de producto</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <!-- Igual que index.html -->
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+  <style>
+    .card{transition:transform .2s, box-shadow .2s}
+    .card:hover{transform:translateY(-4px); box-shadow:0 12px 22px rgba(0,0,0,.08)}
+    .badge{font-size:.75rem}
+    .price-list{font-variant-numeric: tabular-nums}
+    .line-through-10{position:relative}
+    .line-through-10::after{content:"";position:absolute;left:0;right:0;top:55%;height:2px;background:#ef4444;transform:rotate(-8deg)}
+    /* menú categorías (idéntico a index) */
+    .nav-link{position:relative}
+    .nav-link > .dropdown{display:none; position:absolute; left:0; top:100%; min-width:14rem; z-index:50}
+    .nav-link:hover > .dropdown{display:block}
+    /* Zoom en imagen de producto */
+    .zoom-wrap{position:relative; overflow:hidden; border-radius:0.75rem; background:#f9fafb;}
+    .zoom-wrap img{transition:transform .35s ease, filter .2s ease; will-change:transform; transform-origin:center center;}
+    /* El escalado lo activamos vía clase .zoomed (JS) para controlar el origen del zoom */
+    .zoom-wrap img.zoomed{transform:scale(1.25);}
+    /* Cursores coherentes */
+    .cursor-zoom-in{cursor:zoom-in;}
+    .cursor-zoom-out{cursor:zoom-out;}
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+  <!-- Barra de estado de suscripción (igual a index) -->
+  <div id="estadoBar" class="hidden bg-yellow-50 text-yellow-800 text-sm">
+    <div class="max-w-7xl mx-auto px-4 py-2 flex items-center gap-2">
+      <i class="fas fa-info-circle"></i>
+      <span id="estadoMsg">Inicia sesión para ver precios a costo.</span>
+      <a href="/login" class="ml-auto text-yellow-900 underline font-medium">Iniciar sesión</a>
+    </div>
+  </div>
+
+  <!-- HEADER igual a index (fila 1 y fila 2) -->
+  <header class="bg-white shadow-sm sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4">
+      <div class="flex items-center justify-between py-4">
+        <a href="/"><img src="/static/images/logo/logo.png" alt="Farmactiva" class="h-10 md:h-12"></a>
+
+        <!-- Buscador desktop -->
+        <div class="hidden md:flex flex-1 max-w-3xl mx-6">
+          <div class="relative w-full">
+            <input id="q" type="search" placeholder="Busca un medicamento o producto…" class="w-full border border-gray-200 rounded-lg pl-11 pr-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none bg-gray-50" />
+            <i class="fas fa-search absolute left-3 top-2.5 text-gray-400"></i>
+          </div>
+        </div>
+
+        <!-- Acciones -->
+        <nav class="flex items-center gap-4">
+          <a href="/login" id="loginLink" class="text-sm font-medium hover:text-green-600"><i class="far fa-user mr-2"></i> Iniciar sesión</a>
+          <a href="/perfil" id="perfilLink" class="hidden text-sm font-medium hover:text-green-600"><i class="far fa-user mr-2"></i> Mi cuenta</a>
+          <a href="/carrito" class="relative text-sm font-medium hover:text-green-600">
+            <i class="fas fa-shopping-cart mr-2"></i> Carrito
+            <span id="cartCount" class="absolute -top-2 -right-3 bg-green-600 text-white text-xs rounded-full px-1.5">0</span>
+          </a>
+        </nav>
+      </div>
+
+      <!-- Buscador móvil -->
+      <div class="md:hidden pb-3">
+        <div class="relative">
+          <input id="qMobile" type="search" placeholder="Buscar productos…" class="w-full border border-gray-200 rounded-lg pl-11 pr-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none bg-gray-50" />
+          <i class="fas fa-search absolute left-3 top-2.5 text-gray-400"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- HEADER (fila 2: menú de categorías) -->
+    <div class="bg-white border-t border-gray-100">
+      <nav class="max-w-7xl mx-auto px-4">
+        <ul class="flex items-center gap-6 text-sm font-medium text-green-900 py-3 overflow-x-auto">
+          <!-- Medicamentos -->
+          <li class="nav-link">
+            <a href="/categoria/medicamentos" class="hover:text-green-700 flex items-center gap-2">Medicamentos <i class="fas fa-chevron-down text-xs"></i></a>
+            <div class="dropdown bg-white border border-gray-100 rounded-lg shadow-lg mt-2">
+              <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <a href="/categoria/medicamentos/genericos" class="px-3 py-2 rounded hover:bg-gray-50">Genéricos</a>
+                <a href="/categoria/medicamentos/bioequivalentes" class="px-3 py-2 rounded hover:bg-gray-50">Bioequivalentes</a>
+                <a href="/categoria/medicamentos/venta-libre" class="px-3 py-2 rounded hover:bg-gray-50">Venta libre</a>
+                <a href="/categoria/medicamentos/receta" class="px-3 py-2 rounded hover:bg-gray-50">Con receta</a>
+              </div>
+            </div>
+          </li>
+          <!-- Dermocosmética -->
+          <li class="nav-link">
+            <a href="/categoria/dermocosmetica" class="hover:text-green-700 flex items-center gap-2">Dermocosmética <i class="fas fa-chevron-down text-xs"></i></a>
+            <div class="dropdown bg-white border border-gray-100 rounded-lg shadow-lg mt-2">
+              <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <a href="/categoria/dermocosmetica/limpieza" class="px-3 py-2 rounded hover:bg-gray-50">Limpieza</a>
+                <a href="/categoria/dermocosmetica/hidratacion" class="px-3 py-2 rounded hover:bg-gray-50">Hidratación</a>
+                <a href="/categoria/dermocosmetica/antiage" class="px-3 py-2 rounded hover:bg-gray-50">Antiage</a>
+                <a href="/categoria/dermocosmetica/proteccion-solar" class="px-3 py-2 rounded hover:bg-gray-50">Protección solar</a>
+              </div>
+            </div>
+          </li>
+          <!-- Perfumería -->
+          <li class="nav-link">
+            <a href="/categoria/perfumeria" class="hover:text-green-700 flex items-center gap-2">Perfumería <i class="fas fa-chevron-down text-xs"></i></a>
+            <div class="dropdown bg-white border border-gray-100 rounded-lg shadow-lg mt-2">
+              <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <a href="/categoria/perfumeria/damas" class="px-3 py-2 rounded hover:bg-gray-50">Damas</a>
+                <a href="/categoria/perfumeria/caballeros" class="px-3 py-2 rounded hover:bg-gray-50">Caballeros</a>
+                <a href="/categoria/perfumeria/unisex" class="px-3 py-2 rounded hover:bg-gray-50">Unisex</a>
+                <a href="/categoria/perfumeria/sets" class="px-3 py-2 rounded hover:bg-gray-50">Sets</a>
+              </div>
+            </div>
+          </li>
+          <!-- Vitaminas -->
+          <li class="nav-link">
+            <a href="/categoria/vitaminas" class="hover:text-green-700 flex items-center gap-2">Vitaminas <i class="fas fa-chevron-down text-xs"></i></a>
+            <div class="dropdown bg-white border border-gray-100 rounded-lg shadow-lg mt-2">
+              <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <a href="/categoria/vitaminas/multivitaminicos" class="px-3 py-2 rounded hover:bg-gray-50">Multivitamínicos</a>
+                <a href="/categoria/vitaminas/minerales" class="px-3 py-2 rounded hover:bg-gray-50">Minerales</a>
+                <a href="/categoria/vitaminas/omega" class="px-3 py-2 rounded hover:bg-gray-50">Omega</a>
+                <a href="/categoria/vitaminas/infantil" class="px-3 py-2 rounded hover:bg-gray-50">Infantil</a>
+              </div>
+            </div>
+          </li>
+          <!-- Suplementos -->
+          <li class="nav-link">
+            <a href="/categoria/suplementos" class="hover:text-green-700 flex items-center gap-2">Suplementos <i class="fas fa-chevron-down text-xs"></i></a>
+            <div class="dropdown bg-white border border-gray-100 rounded-lg shadow-lg mt-2">
+              <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <a href="/categoria/suplementos/deportivos" class="px-3 py-2 rounded hover:bg-gray-50">Deportivos</a>
+                <a href="/categoria/suplementos/mascotas" class="px-3 py-2 rounded hover:bg-gray-50">Mascotas</a>
+                <a href="/categoria/suplementos/herbales" class="px-3 py-2 rounded hover:bg-gray-50">Herbales</a>
+                <a href="/categoria/suplementos/otros" class="px-3 py-2 rounded hover:bg-gray-50">Otros</a>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Contenido -->
+  <main class="max-w-7xl mx-auto px-4 py-6">
+    <!-- Breadcrumb -->
+    <nav class="text-sm text-gray-500 mb-4">
+      <a href="/" class="hover:text-green-700">Inicio</a>
+      <span class="mx-2">›</span>
+      <span id="breadcrumbCat">Productos</span>
+    </nav>
+
+    <!-- Grid detalle -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <!-- Columna izquierda: imagen (con zoom) -->
+      <div class="bg-white border border-gray-100 rounded-xl p-4">
+        <div id="imgBox" class="zoom-wrap h-96 w-full max-w-md mx-auto cursor-zoom-in">
+          <img id="imgProducto"
+              src=""
+              alt=""
+              class="w-full h-full object-contain"
+              onerror="this.onerror=null;this.src='/static/images/productos/Kitadol_(B)_Paracetamol_500_mg_24_Comprimidos.jpg';">
+        </div>
+      </div>
+
+      <!-- Columna derecha: info -->
+      <div>
+        <h1 id="nombreProducto" class="text-2xl font-semibold"></h1>
+
+        <div class="mt-3">
+          <div id="precioProducto" class="text-2xl font-bold text-gray-900"></div>
+          <p id="precioPorUnidad" class="text-sm text-gray-500 mt-1"></p>
+        </div>
+
+        <div id="avisoStock" class="mt-3 hidden text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          ⚠️ ¡Quedan pocas unidades!
+        </div>
+
+        <div class="mt-4 flex items-center gap-3">
+          <label class="text-sm">Cantidad</label>
+          <input id="cantidadInput" type="number" min="1" value="1" class="w-24 border rounded-lg px-3 py-2">
+        </div>
+
+        <div class="mt-4 flex gap-3">
+          <button id="btnAgregar" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-medium">Agregar al carrito</button>
+          <button id="btnComprar" class="flex-1 bg-gray-900 hover:bg-black text-white py-3 rounded-lg font-medium">Comprar ahora</button>
+        </div>
+
+        <!-- Ficha técnica -->
+        <section class="mt-8 bg-white border border-gray-100 rounded-xl">
+          <div class="px-4 py-3 border-b font-semibold">Ficha técnica</div>
+          <dl class="px-4 py-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+            <div><dt class="text-gray-500">Presentación</dt><dd id="ftPresentacion" class="font-medium"></dd></div>
+            <div><dt class="text-gray-500">Condiciones de almacenamiento</dt><dd id="ftAlmacenamiento" class="font-medium"></dd></div>
+            <div><dt class="text-gray-500">Nombre farmacéutico</dt><dd id="ftNombreFarm" class="font-medium"></dd></div>
+            <div><dt class="text-gray-500">Principio activo</dt><dd id="ftPA" class="font-medium"></dd></div>
+            <div><dt class="text-gray-500">Cantidad por envase</dt><dd id="ftCantidadEnvase" class="font-medium"></dd></div>
+            <div><dt class="text-gray-500">Registro</dt><dd id="ftRegistro" class="font-medium"></dd></div>
+            <div><dt class="text-gray-500">Laboratorio</dt><dd id="ftLab" class="font-medium"></dd></div>
+            <div><dt class="text-gray-500">Condición de venta</dt><dd id="ftCondVenta" class="font-medium"></dd></div>
+          </dl>
+        </section>
+      </div>
+    </div>
+
+    <!-- Bioequivalentes -->
+    <section class="mt-10">
+      <h2 class="text-lg font-semibold mb-3">Productos bioequivalentes</h2>
+      <div id="bioRow" class="grid grid-cols-2 md:grid-cols-4 gap-6"></div>
+    </section>
+  </main>
+
+  <!-- Footer (idéntico a index.html) -->
+  <footer class="bg-gray-900 text-gray-300">
+    <div class="max-w-7xl mx-auto px-4 py-10 grid md:grid-cols-4 gap-8">
+      <div class="md:col-span-2">
+        <img src="/static/images/logo/logo.png" class="h-10 mb-4" alt="Farmactiva">
+        <p>Acceso a medicamentos con precios justos y transparentes.</p>
+      </div>
+      <div>
+        <h4 class="font-semibold mb-2 text-white">Ayuda</h4>
+        <ul class="space-y-1 text-sm">
+          <li><a href="/preguntas" class="hover:text-white">Preguntas frecuentes</a></li>
+          <li><a href="/contacto" class="hover:text-white">Contacto</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 class="font-semibold mb-2 text-white">Legal</h4>
+        <ul class="space-y-1 text-sm">
+          <li><a href="/terminos" class="hover:text-white">Términos y condiciones</a></li>
+          <li><a href="/privacidad" class="hover:text-white">Privacidad</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="border-t border-gray-800 text-sm text-gray-400">
+      <div class="max-w-7xl mx-auto px-4 py-4">&copy; 2025 Farmactiva</div>
+    </div>
+  </footer>
+
+
+  <!-- JS inline (MVP) -->
+  <script>
+    // ======= Estado sesión / suscripción (mismo comportamiento que index) =======
+    let suscripcionActiva = false;
+    let logged = false;
+
+    async function cargarEstado() {
+      try {
+        const r = await fetch('/api/suscripcion/estado', {credentials:'include'});
+        if (r.ok) {
+          const j = await r.json();
+          suscripcionActiva = !!j.activa;
+          logged = !!j.logged;
+        }
+      } catch(e) { /* visitante */ }
+      pintarEstado();
+    }
+
+    function pintarEstado() {
+      const bar = document.getElementById('estadoBar');
+      const msg = document.getElementById('estadoMsg');
+      const loginLink = document.getElementById('loginLink');
+      const perfilLink = document.getElementById('perfilLink');
+
+      if (logged) { loginLink.classList.add('hidden'); perfilLink.classList.remove('hidden'); }
+      if (!suscripcionActiva) {
+        bar.classList.remove('hidden');
+        msg.textContent = 'Tu suscripción no está activa. Verás precio público. Suscríbete para comprar a costo.';
+      } else {
+        bar.classList.add('hidden');
+      }
+    }
+
+    // ======= Producto dummy (MVP) =======
+    const DUMMY_SLUG = "paracetamol-500mg-20-comp-gen";
+    const PRODUCTS = {
+      [DUMMY_SLUG]: {
+        slug: DUMMY_SLUG,
+        nombre: "Kitadol (B) Paracetamol 500 mg 24 Comprimidos",
+        precio: 599,
+        unidadFraccion: "comprimido",
+        cantidadEnvase: 24,
+        stock: 8,
+        imagen: "/static/images/productos/Kitadol_(B)_Paracetamol_500_mg_24_Comprimidos.jpg",
+        presentacion: "20 comprimidos",
+        almacenamiento: "Conservar a temperatura ambiente (15-25°C).",
+        nombreFarmaceutico: "Paracetamol",
+        principioActivo: "Paracetamol",
+        registro: "IS-55555/23",
+        laboratorio: "Laboratorio Genérico",
+        condicionVenta: "Venta directa",
+        categoria: "Medicamentos",
+        bioequivalentes: []
+      }
+    };
+
+    const formatCLP = (n) => {
+      try { return n.toLocaleString("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }); }
+      catch { return "$" + (Math.round(n) || n); }
+    };
+    const precioPorUnidad = (precioEnvase, cantidad) => {
+      if (!cantidad || cantidad <= 0) return null;
+      return Math.round(precioEnvase / cantidad);
+    };
+
+    // === Cart (localStorage) ===
+    const CART_KEY = 'fa_cart';
+    const getCart = () => { try { return JSON.parse(localStorage.getItem(CART_KEY)) || { items: [] } } catch { return { items: [] } } };
+    const saveCart = (c) => { localStorage.setItem(CART_KEY, JSON.stringify(c)); updateCartCount(); };
+    const updateCartCount = () => {
+      const el = document.getElementById('cartCount');
+      if (!el) return;
+      const c = getCart();
+      el.textContent = String(c.items.reduce((a, i) => a + i.qty, 0));
+    };
+    const addToCart = (item) => {
+      const c = getCart();
+      const i = c.items.findIndex(x => x.slug === item.slug);
+      if (i > -1) { c.items[i].qty += item.qty; } else { c.items.push(item); }
+      saveCart(c);
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Cabecera coherente con index
+      cargarEstado();
+      updateCartCount();
+
+      // Forzamos el dummy
+      const producto = PRODUCTS[DUMMY_SLUG];
+
+      // Render básicos
+      document.getElementById("breadcrumbCat").textContent = producto.categoria || "Productos";
+      const img = document.getElementById("imgProducto");
+      img.src = producto.imagen;
+      img.alt = producto.nombre;
+      // Fallback por si la ruta falla
+      img.addEventListener('error', () => {
+        img.src = '/static/images/productos/Kitadol_(B)_Paracetamol_500_mg_24_Comprimidos.jpg';
+      });
+
+      document.getElementById("nombreProducto").textContent = producto.nombre;
+      document.getElementById("precioProducto").textContent = formatCLP(producto.precio);
+
+      // Precio por unidad DEBAJO del precio
+      const ppuEl = document.getElementById("precioPorUnidad");
+      const ppu = precioPorUnidad(producto.precio, producto.cantidadEnvase);
+      if (ppu) {
+        ppuEl.textContent = `Precio por unidad fraccionada: ${formatCLP(ppu)}`;
+        ppuEl.classList.remove('hidden');
+      } else {
+        ppuEl.classList.add('hidden');
+      }
+
+      // Stock bajo
+      if (typeof producto.stock === "number" && producto.stock < 3) {
+        const n = producto.stock;
+        const aviso = document.getElementById("avisoStock");
+        aviso.classList.remove("hidden");
+        aviso.textContent = n <= 0 ? "⚠️ Sin stock" : `⚠️ ¡Quedan ${n} ${n===1?'unidad':'unidades'}!`;
+      }
+
+      // Ficha técnica
+      document.getElementById("ftPresentacion").textContent   = producto.presentacion || "-";
+      document.getElementById("ftAlmacenamiento").textContent = producto.almacenamiento || "-";
+      document.getElementById("ftNombreFarm").textContent     = producto.nombreFarmaceutico || "-";
+      document.getElementById("ftPA").textContent             = producto.principioActivo || "-";
+      document.getElementById("ftCantidadEnvase").textContent = (producto.cantidadEnvase ?? "-");
+      document.getElementById("ftRegistro").textContent       = producto.registro || "-";
+      document.getElementById("ftLab").textContent            = producto.laboratorio || "-";
+      document.getElementById("ftCondVenta").textContent      = producto.condicionVenta || "-";
+
+      // Acciones (MVP)
+      document.getElementById("btnAgregar").addEventListener("click", () => {
+        const qty = Math.max(1, parseInt(document.getElementById("cantidadInput").value || "1", 10));
+        addToCart({
+          slug: producto.slug,
+          nombre: producto.nombre,
+          precio: producto.precio,
+          image: producto.imagen,
+          qty
+        });
+        alert(`✅ Agregado al carrito: ${producto.nombre} x ${qty}`);
+      });
+
+      document.getElementById("btnComprar").addEventListener("click", () => {
+        addToCart({
+          slug: producto.slug,
+          nombre: producto.nombre,
+          precio: producto.precio,
+          image: producto.imagen,
+          qty: 1
+        });
+        window.location.href = "/carrito";
+      });
+
+      // Bioequivalentes
+      const bioRow = document.getElementById("bioRow");
+      bioRow.innerHTML = `<div class="text-sm text-gray-500">No hay bioequivalentes registrados.</div>`;
+
+      // =========================
+      // Zoom de imagen en hover
+      // =========================
+      const wrap = document.getElementById('imgBox') || img.parentElement; // usa el contenedor si existe; si no, el padre
+      if (wrap && img) {
+        // Asegura estilos base del contenedor (por si no están en CSS)
+        wrap.style.position = wrap.style.position || 'relative';
+        wrap.style.overflow = wrap.style.overflow || 'hidden';
+        // Cursores
+        wrap.classList.add('cursor-zoom-in');
+
+        const enableZoom = (e) => {
+          if (e.pointerType === 'touch') return;       // evita zoom en táctiles
+          img.style.transition = 'transform .35s ease';
+          img.style.willChange = 'transform';
+          img.style.transform = 'scale(1.25)';
+          wrap.classList.remove('cursor-zoom-in');
+          wrap.classList.add('cursor-zoom-out');
+        };
+
+        const disableZoom = () => {
+          img.style.transformOrigin = 'center center';
+          img.style.transform = 'scale(1)';
+          wrap.classList.add('cursor-zoom-in');
+          wrap.classList.remove('cursor-zoom-out');
+        };
+
+        const move = (e) => {
+          // solo si está ampliada
+          if (getComputedStyle(img).transform === 'none') return;
+          const rect = wrap.getBoundingClientRect();
+          const x = ((e.clientX - rect.left) / rect.width) * 100;
+          const y = ((e.clientY - rect.top)  / rect.height) * 100;
+          img.style.transformOrigin = `${x}% ${y}%`;
+        };
+
+        wrap.addEventListener('pointerenter', enableZoom);
+        wrap.addEventListener('pointerleave', disableZoom);
+        wrap.addEventListener('pointermove',  move);
+      }
+    });
+
+  </script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+{% extends "base_admin.html" %}
+{% block title %}Márgenes PTS{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto p-6">
+  <a href="/admin/productos" class="text-sm text-slate-600 hover:underline">Volver</a>
+  <h1 class="text-2xl font-semibold mt-2">Márgenes PTS por tipo de medicamento</h1>
+  <p class="text-slate-600 mt-1">
+    En modo <b>PTS</b> el precio de venta se calcula como <code>costo_neto × (1 + margen)</code>.
+    Aquí puedes configurar los márgenes por tipo y el margen por defecto para tipos no asignados.
+  </p>
+
+  <!-- Margen default -->
+  <div class="bg-white border rounded-xl p-5 mt-6">
+    <div class="flex items-center justify-between gap-4 flex-wrap">
+      <div>
+        <h2 class="font-medium text-slate-800">Margen por defecto</h2>
+        <p class="text-sm text-slate-500">Se aplica a productos cuyo tipo no tenga margen específico.</p>
+      </div>
+      <form id="frmDefault" class="flex items-center gap-3">
+        <div class="flex items-center gap-2">
+          <label class="text-sm text-slate-700">Margen (%)</label>
+          <input id="margen_default" name="margen_default" type="number" step="0.01" min="0" max="500"
+                 class="w-32 border rounded-lg px-3 py-2 text-right"
+                 value="{{ (margen_default|float * 100) if margen_default is not none else '8.00' }}">
+        </div>
+        <button id="btnSaveDefault" type="submit"
+                class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white">
+          Guardar
+        </button>
+      </form>
+    </div>
+    <p class="text-xs text-slate-500 mt-2">
+      Ingresa el valor en <b>porcentaje</b>. Ej: <code>5</code> = 5%. Acepta decimales (ej: 2.5).
+    </p>
+  </div>
+
+  <!-- Márgenes por tipo -->
+  <div class="bg-white border rounded-xl p-5 mt-6">
+    <div class="flex items-center justify-between gap-4 flex-wrap mb-3">
+      <h2 class="font-medium text-slate-800">Márgenes por tipo de medicamento</h2>
+      <div class="text-xs text-slate-500">
+        Sugerencias: Marca ≈ 3%, Bioequivalente ≈ 5%, Genérico ≈ 20%.
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead>
+          <tr class="text-left text-slate-600">
+            <th class="py-2 pr-4">Tipo</th>
+            <th class="py-2 pr-4 w-40">Margen (%)</th>
+            <th class="py-2 pr-4 w-40">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="align-top">
+          {% for t in tipos %}
+          <tr class="border-t">
+            <td class="py-2 pr-4">{{ t.nombre }}</td>
+            <td class="py-2 pr-4">
+              <input id="margen_{{ t.id_tipo_medicamento }}" type="number" step="0.01" min="0" max="500"
+                     class="w-32 border rounded-lg px-3 py-2 text-right"
+                     value="{{ (t.margen|float * 100) if t.margen is not none else '' }}"
+                     placeholder="—">
+            </td>
+            <td class="py-2 pr-4">
+              <button data-id="{{ t.id_tipo_medicamento }}"
+                      class="btn-save-type px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white">
+                Guardar
+              </button>
+              <span id="state_{{ t.id_tipo_medicamento }}" class="ml-2 text-xs"></span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <p class="text-xs text-slate-500 mt-3">
+      Ingresa valores en <b>%</b>. Si escribes un valor menor a 1 (ej: 0.05) se interpretará como <code>0.05 = 5%</code>.
+    </p>
+  </div>
+</div>
+
+<script>
+  // Utilidad: convierte a decimal respetando entradas % o decimales
+  function parseMarginToDecimal(valueStr) {
+    if (valueStr == null) return null;
+    const s = String(valueStr).replace('%','').trim();
+    if (!s) return null;
+    const v = Number(s);
+    if (!isFinite(v) || v < 0) return null;
+    // Si el usuario ingresa 0.05 lo interpretamos como 5%
+    // => decimal = 0.05 ; si ingresa 5 => 5%
+    return (v <= 1 ? v : (v / 100));
+  }
+
+  // Guardar margen default
+  const frmDefault = document.getElementById('frmDefault');
+  const btnSaveDef = document.getElementById('btnSaveDefault');
+  frmDefault?.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const input = document.getElementById('margen_default');
+    const dec = parseMarginToDecimal(input.value);
+    if (dec == null) { alert('Valor inválido'); return; }
+    try {
+      btnSaveDef.disabled = true;
+      const fd = new FormData();
+      fd.append('margen_default', String(dec));
+      const res = await fetch('/admin/pts/margenes/guardar-default', { method: 'POST', body: fd, credentials: 'same-origin' });
+      const data = await res.json();
+      if (data.ok) {
+        btnSaveDef.textContent = 'Guardado ✓';
+        setTimeout(() => { btnSaveDef.textContent = 'Guardar'; btnSaveDef.disabled = false; }, 1200);
+      } else {
+        btnSaveDef.disabled = false;
+        alert(data.error || 'No se pudo guardar');
+      }
+    } catch (e) {
+      btnSaveDef.disabled = false;
+      alert('Error de red');
+      console.error(e);
+    }
+  });
+
+  // Guardar por tipo
+  document.querySelectorAll('.btn-save-type').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-id');
+      const input = document.getElementById(`margen_${id}`);
+      const state = document.getElementById(`state_${id}`);
+      const dec = parseMarginToDecimal(input.value);
+      if (dec == null) { alert('Valor inválido'); return; }
+
+      try {
+        btn.disabled = true;
+        state.textContent = 'Guardando…';
+        const fd = new FormData();
+        fd.append('id_tipo_medicamento', id);
+        fd.append('margen', String(dec));
+        const res = await fetch('/admin/pts/margenes/guardar', { method: 'POST', body: fd, credentials: 'same-origin' });
+        const data = await res.json();
+        if (data.ok) {
+          state.textContent = 'Guardado ✓';
+          setTimeout(() => { state.textContent = ''; btn.disabled = false; }, 1200);
+        } else {
+          state.textContent = '';
+          btn.disabled = false;
+          alert(data.error || 'No se pudo guardar');
+        }
+      } catch (e) {
+        state.textContent = '';
+        btn.disabled = false;
+        alert('Error de red');
+        console.error(e);
+      }
+    });
+  });
+</script>
+{% endblock %}
