@@ -96,9 +96,7 @@ def list_tables(schema: str = "public") -> Dict[str, Any]:
     """Lista tablas del esquema (public por defecto)."""
     try:
         insp = inspect(ENGINE)
-        tables = insp.get_table_names(schema=sc
-
-hema)
+        tables = insp.get_table_names(schema=schema)
         return {"ok": True, "schema": schema, "tables": tables}
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail=f"No se pudo listar tablas: {e}")
