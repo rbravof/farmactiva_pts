@@ -5,12 +5,17 @@ import os
 from urllib.parse import urlparse, parse_qs
 from typing import Dict, Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.dependencies import require_admin
 
 # -------------------------------------------------------------------
 # URL de Render con todos los datos (fallback si no hay variables)
+# *Sugerencia:* evita hardcodear secretos en producción real.
 # -------------------------------------------------------------------
 _RENDER_URL = (
     "postgresql+psycopg2://"
@@ -91,20 +96,42 @@ def list_tables(schema: str = "public") -> Dict[str, Any]:
     """Lista tablas del esquema (public por defecto)."""
     try:
         insp = inspect(ENGINE)
-        tables = insp.get_table_names(schema=schema)
+        tables = insp.get_table_names(schema=sc
+
+hema)
         return {"ok": True, "schema": schema, "tables": tables}
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail=f"No se pudo listar tablas: {e}")
 
-@router.post("/create-tables")
-def create_tables() -> Dict[str, Any]:
+@router.post("/create-tables")  # <-- OJO: sin /admin/db, ya está en el prefix
+def admin_db_create_tables(
+    db: Session = Depends(get_db),
+    admin_user: dict = Depends(require_admin),
+):
     """
-    Crea todas las tablas definidas en app.models.Base en esta DB.
-    Úsalo una sola vez en bases vacías.
+    Crea todas las tablas declaradas en app.models.* dentro del mismo MetaData.
+    Asegura extensión CITEXT y fuerza la carga de modelos que definen FKs (Region/Comuna/Bodega, etc.)
     """
+    # 1) Extensión CITEXT (necesaria para columnas citext)
     try:
-        from app.models import Base  # importa tus modelos
-        Base.metadata.create_all(bind=ENGINE)
-        return {"ok": True, "msg": "Tablas creadas (si no existían)."}
+        db.execute(text("CREATE EXTENSION IF NOT EXISTS citext;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+        # no hacemos fail si no hay permisos; sólo avisamos
+        print("[db-tools] WARN: no se pudo crear extensión citext (quizá ya existe o sin permisos)")
+
+    # 2) Importa TODO el módulo de modelos para registrar tablas/relaciones en Base.metadata
+    from app import models as m
+
+    # 3) Tocar explícitamente clases clave para garantizar que están registradas
+    _ = (m.Region, m.Comuna, m.Bodega)  # agrega otras si tuvieran FKs encadenadas
+
+    # 4) Ejecutar create_all sobre el engine real, no sobre una conexión “huérfana”
+    try:
+        bind = db.get_bind()
+        m.Base.metadata.create_all(bind=bind)
+        return {"ok": True, "created": True}
     except Exception as e:
+        print("[db-tools] ERROR create_all:", e)
         raise HTTPException(status_code=500, detail=f"Error creando tablas: {e}")
