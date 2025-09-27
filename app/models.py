@@ -12,6 +12,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship, Mapped, mapped_column  # <-- sin declarative_base
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import CITEXT
 
 from app.database import Base  # <-- usa la Base central del proyecto
 
@@ -262,6 +263,59 @@ class ClienteDireccion(Base):
     # (Opcional) relationships a catálogo y ubigeo
     tipo: Mapped["TipoDireccion"] = relationship("TipoDireccion")
 
+# -------------------------------------------------
+# Regiones
+# -------------------------------------------------
+class Region(Base):
+    __tablename__ = "regiones"
+    __table_args__ = {"schema": "public"}
+
+    id_region: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nombre: Mapped[str]    = mapped_column(CITEXT(), nullable=False, unique=True)
+    abreviatura: Mapped[str | None] = mapped_column(String(10))
+    orden: Mapped[int]     = mapped_column(SmallInteger, nullable=False, server_default=text("0"))
+    activo: Mapped[bool]   = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    fecha_creacion: Mapped[DateTime] = mapped_column(DateTime(timezone=False), nullable=False, server_default=func.now())
+
+    comunas: Mapped[list["Comuna"]] = relationship(
+        "Comuna",
+        back_populates="region",
+        lazy="selectin"
+    )
+
+    def __repr__(self) -> str:
+        return f"<Region id={self.id_region} nombre={self.nombre!r}>"
+
+
+# -------------------------------------------------
+# Comunas
+# -------------------------------------------------
+class Comuna(Base):
+    __tablename__ = "comunas"
+    __table_args__ = (
+        UniqueConstraint("id_region", "nombre", name="comunas_region_nombre_uk"),
+        {"schema": "public"},
+    )
+
+    id_comuna: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id_region: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("public.regiones.id_region", ondelete="CASCADE"),
+        nullable=False,
+    )
+    nombre: Mapped[str] = mapped_column(CITEXT(), nullable=False)
+    orden: Mapped[int]  = mapped_column(SmallInteger, nullable=False, server_default=text("0"))
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    fecha_creacion: Mapped[DateTime] = mapped_column(DateTime(timezone=False), nullable=False, server_default=func.now())
+
+    region: Mapped["Region"] = relationship(
+        "Region",
+        back_populates="comunas",
+        lazy="joined"
+    )
+
+    def __repr__(self) -> str:
+        return f"<Comuna id={self.id_comuna} nombre={self.nombre!r} region={self.id_region}>"
 
 # ===========================
 # ENVIOS & TARIFAS
