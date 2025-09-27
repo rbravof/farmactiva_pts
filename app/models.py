@@ -949,6 +949,8 @@ class Producto(Base):
         lazy="selectin",
     )
 
+    precios: Mapped[list["Precio"]] = relationship("Precio", back_populates="producto", cascade="all, delete-orphan")
+
     # Alias opcional para “nombre”
     @hybrid_property
     def nombre(self) -> str:
@@ -1088,6 +1090,52 @@ class EtiquetaProducto(Base):
 # ---------------------------------------
 # Canales, Precios, Sucursales, Inventario
 # ---------------------------------------
+class ListaPrecio(Base):
+    __tablename__ = "listas_precios"
+    __table_args__ = {"schema": "public"}
+
+    id_lista: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nombre:   Mapped[str] = mapped_column(String, nullable=False)
+    slug:     Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    activa:   Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"), default=True)
+
+    precios: Mapped[list["Precio"]] = relationship(
+        "Precio", back_populates="lista", cascade="all, delete-orphan"
+    )
+
+    def __repr__(self) -> str:
+        return f"<ListaPrecio id={self.id_lista} slug={self.slug!r} activa={self.activa}>"
+
+# -------------------------
+# Precios (public.precios)
+# -------------------------
+class Precio(Base):
+    __tablename__ = "precios"
+    __table_args__ = {"schema": "public"}
+
+    id_precio:     Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id_producto:   Mapped[int] = mapped_column(
+        Integer, ForeignKey("public.productos.id_producto", ondelete="CASCADE"), nullable=False
+    )
+    id_lista:      Mapped[int] = mapped_column(
+        Integer, ForeignKey("public.listas_precios.id_lista", ondelete="CASCADE"), nullable=False
+    )
+    precio_bruto:  Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    iva_tasa:      Mapped[float] = mapped_column(Numeric(5, 2), nullable=False, server_default=text("19.0"))
+    vigente_desde: Mapped["datetime"] = mapped_column(DateTime(timezone=False), nullable=False, server_default=text("now()"))
+    vigente_hasta: Mapped["datetime | None"] = mapped_column(DateTime(timezone=False), nullable=True)
+    fuente:        Mapped[str | None] = mapped_column(String(40), nullable=True, server_default=text("'manual'"))
+    creado_por:    Mapped[str | None] = mapped_column(String(80), nullable=True)
+    creado_en:     Mapped["datetime | None"] = mapped_column(DateTime(timezone=False), nullable=True, server_default=text("now()"))
+
+    # Relaciones
+    lista:     Mapped["ListaPrecio"] = relationship("ListaPrecio", back_populates="precios")
+    # Asumiendo que tu modelo Producto se llama 'Producto' y está en schema public
+    producto:  Mapped["Producto"] = relationship("Producto", back_populates="precios", viewonly=True)
+
+    def __repr__(self) -> str:
+        return f"<Precio id={self.id_precio} prod={self.id_producto} lista={self.id_lista} bruto={self.precio_bruto}>"
+
 class CanalVenta(Base):
     __tablename__ = "canales_venta"
 

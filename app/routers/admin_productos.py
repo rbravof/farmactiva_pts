@@ -255,19 +255,21 @@ SQL_LIST = text("""
     p.imagen_principal_url,
     p.visible_web,
     s.nombre AS subcategoria,
-    (
-      SELECT pr.precio_bruto
-      FROM precios pr
-      JOIN listas_precios lp ON lp.id_lista = pr.id_lista
-      WHERE pr.id_producto = p.id_producto
-        AND lp.slug = :slug_activo
-        AND pr.vigente_hasta IS NULL
-      ORDER BY pr.vigente_desde DESC
-      LIMIT 1
-    )::numeric AS precio_venta,
+    precio.precio_bruto::numeric AS precio_venta,
     0::int AS stock
-  FROM productos p
-  LEFT JOIN subcategorias s ON s.id_subcategoria = p.subcategoria_id
+  FROM public.productos p
+  LEFT JOIN public.subcategorias s
+    ON s.id_subcategoria = p.subcategoria_id
+  LEFT JOIN LATERAL (
+    SELECT pr.precio_bruto
+    FROM public.precios pr
+    JOIN public.listas_precios lp ON lp.id_lista = pr.id_lista
+    WHERE pr.id_producto = p.id_producto
+      AND lp.slug = :slug_activo
+      AND pr.vigente_hasta IS NULL
+    ORDER BY pr.vigente_desde DESC
+    LIMIT 1
+  ) AS precio ON TRUE
   ORDER BY p.visible_web DESC, lower(p.titulo) ASC
   LIMIT 500
 """)
