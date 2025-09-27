@@ -5,17 +5,15 @@ import os
 from urllib.parse import urlparse, parse_qs
 from typing import Dict, Any
 
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Header, Query
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
 
-from app.database import get_db
-from app.routers.admin_security import require_admin
+# Usa el mismo SessionLocal que el resto de la app
+from app.database import SessionLocal
 
 # -------------------------------------------------------------------
 # URL de Render con todos los datos (fallback si no hay variables)
-# *Sugerencia:* evita hardcodear secretos en producción real.
 # -------------------------------------------------------------------
 _RENDER_URL = (
     "postgresql+psycopg2://"
@@ -25,39 +23,38 @@ _RENDER_URL = (
 )
 
 def _db_url() -> str:
-    """Toma PTS_DB_URL/DATABASE_URL o usa el fallback de Render; normaliza driver y SSL."""
     url = os.getenv("PTS_DB_URL") or os.getenv("DATABASE_URL") or _RENDER_URL
-
-    # Asegura driver psycopg2 para SQLAlchemy si viene como postgresql://
     if url.startswith("postgresql://"):
         url = "postgresql+psycopg2://" + url.split("postgresql://", 1)[1]
-
-    # Asegura sslmode=require (Render lo exige)
     if "sslmode=" not in url:
         url += ("&" if "?" in url else "?") + "sslmode=require"
-
     return url
 
 def _mask(url: str) -> str:
-    """Oculta la contraseña en la URL para devolverla por API."""
     try:
-        parsed = urlparse(url)
-        if "@" not in parsed.netloc or ":" not in parsed.netloc:
+        p = urlparse(url)
+        if "@" not in p.netloc or ":" not in p.netloc:
             return url
-        creds, host = parsed.netloc.split("@", 1)
+        creds, host = p.netloc.split("@", 1)
         user, _pwd = creds.split(":", 1)
-        netloc_mask = f"{user}:***@{host}"
-        return parsed._replace(netloc=netloc_mask).geturl()
+        return p._replace(netloc=f"{user}:***@{host}").geturl()
     except Exception:
         return url
 
-# Engine global y router
 ENGINE = create_engine(_db_url(), pool_pre_ping=True, future=True)
 router = APIRouter(prefix="/admin/db", tags=["DB"])
 
+def _require_setup_token(hdr_token: str | None, q_token: str | None):
+    """Permite inicializar sin login, pero exige un token de setup."""
+    expected = os.getenv("SETUP_TOKEN", "").strip()
+    provided = (hdr_token or q_token or "").strip()
+    if not expected:
+        raise HTTPException(status_code=500, detail="Falta SETUP_TOKEN en el servidor.")
+    if provided != expected:
+        raise HTTPException(status_code=401, detail="Token de setup inválido.")
+
 @router.get("/url")
 def db_url_info() -> Dict[str, Any]:
-    """Devuelve la URL (sin password) y sus partes para verificar conexión."""
     url = _db_url()
     p = urlparse(url)
     q = parse_qs(p.query or "")
@@ -74,26 +71,19 @@ def db_url_info() -> Dict[str, Any]:
 
 @router.get("/ping")
 def db_ping() -> Dict[str, Any]:
-    """Hace un SELECT simple para comprobar que la DB responde."""
     try:
         with ENGINE.connect() as conn:
             version = conn.execute(text("select version()")).scalar_one()
             now = conn.execute(text("select now()")).scalar_one()
             current_db = conn.execute(text("select current_database()")).scalar_one()
             current_user = conn.execute(text("select current_user")).scalar_one()
-        return {
-            "ok": True,
-            "version": version,
-            "now": str(now),
-            "database": current_db,
-            "user": current_user,
-        }
+        return {"ok": True, "version": version, "now": str(now),
+                "database": current_db, "user": current_user}
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail=f"DB ping error: {e}")
 
 @router.get("/tables")
 def list_tables(schema: str = "public") -> Dict[str, Any]:
-    """Lista tablas del esquema (public por defecto)."""
     try:
         insp = inspect(ENGINE)
         tables = insp.get_table_names(schema=schema)
@@ -101,71 +91,38 @@ def list_tables(schema: str = "public") -> Dict[str, Any]:
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail=f"No se pudo listar tablas: {e}")
 
-@router.post("/create-tables")  # <-- OJO: sin /admin/db, ya está en el prefix
+@router.post("/create-tables")
 def admin_db_create_tables(
-    db: Session = Depends(get_db),
-    admin_user: dict = Depends(require_admin),
+    x_setup_token: str | None = Header(None, convert_underscores=False),
+    token: str | None = Query(None),
 ):
     """
-    Crea todas las tablas declaradas en app.models.* dentro del mismo MetaData.
-    Asegura extensión CITEXT y fuerza la carga de modelos que definen FKs (Region/Comuna/Bodega, etc.)
+    Crea todas las tablas declaradas en app.models.Base.metadata.
+    Protegido por cabecera X-Setup-Token o query ?token=...
     """
-    # 1) Extensión CITEXT (necesaria para columnas citext)
+    _require_setup_token(x_setup_token, token)
+
+    db = SessionLocal()
     try:
-        db.execute(text("CREATE EXTENSION IF NOT EXISTS citext;"))
-        db.commit()
-    except Exception:
-        db.rollback()
-        # no hacemos fail si no hay permisos; sólo avisamos
-        print("[db-tools] WARN: no se pudo crear extensión citext (quizá ya existe o sin permisos)")
+        # Extensión CITEXT (si Render lo permite)
+        try:
+            db.execute(text("CREATE EXTENSION IF NOT EXISTS citext;"))
+            db.commit()
+        except Exception:
+            db.rollback()
+            print("[db-tools] WARN: no se pudo crear extensión citext (permiso o ya existe)")
 
-    # 2) Importa TODO el módulo de modelos para registrar tablas/relaciones en Base.metadata
-    from app import models as m
+        # Importa modelos para registrar todas las tablas en el mismo metadata
+        from app import models as m
+        # Forzamos tocar clases con FKs importantes
+        _ = (m.Region, m.Comuna)
 
-    # 3) Tocar explícitamente clases clave para garantizar que están registradas
-    _ = (m.Region, m.Comuna, m.Bodega)  # agrega otras si tuvieran FKs encadenadas
-
-    # 4) Ejecutar create_all sobre el engine real, no sobre una conexión “huérfana”
-    try:
-        bind = db.get_bind()
-        m.Base.metadata.create_all(bind=bind)
+        # Ejecuta create_all en el bind de la sesión
+        m.Base.metadata.create_all(bind=db.get_bind())
         return {"ok": True, "created": True}
     except Exception as e:
-        print("[db-tools] ERROR create_all:", e)
-        raise HTTPException(status_code=500, detail=f"Error creando tablas: {e}")
-
-@router.post("/bootstrap")
-def admin_db_bootstrap(
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    """
-    Bootstrap inicial para crear tablas sin login de admin.
-    Protegido por un token en header 'X-Setup-Token' o query ?token=...
-    Debe coincidir con la var de entorno DB_BOOTSTRAP_TOKEN (o ADMIN_BOOTSTRAP_TOKEN).
-    """
-    token = request.headers.get("X-Setup-Token") or request.query_params.get("token")
-    expected = os.getenv("DB_BOOTSTRAP_TOKEN") or os.getenv("ADMIN_BOOTSTRAP_TOKEN")
-    if not expected or token != expected:
-        raise HTTPException(status_code=401, detail="Token inválido")
-
-    # 1) Extensión CITEXT (si hay permisos)
-    try:
-        db.execute(text("CREATE EXTENSION IF NOT EXISTS citext;"))
-        db.commit()
-    except Exception:
         db.rollback()
-        print("[db-tools] WARN: no se pudo crear extensión citext")
-
-    # 2) Registrar modelos
-    from app import models as m
-    _ = (m.Region, m.Comuna, m.Bodega)  # “tocar” relaciones clave
-
-    # 3) Crear tablas
-    try:
-        bind = db.get_bind()
-        m.Base.metadata.create_all(bind=bind)
-        return {"ok": True, "created": True, "via": "bootstrap"}
-    except Exception as e:
         print("[db-tools] ERROR create_all:", e)
         raise HTTPException(status_code=500, detail=f"Error creando tablas: {e}")
+    finally:
+        db.close()
