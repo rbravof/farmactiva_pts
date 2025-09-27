@@ -21,6 +21,7 @@ from app.routers import admin_precios
 from app.routers import admin_menu
 from app.routers import admin_pagos
 from app.routers import public_pagos
+from app.routers import db_tools
 
 app = FastAPI(
     title="Farmactiva · Por tu Salud",
@@ -61,6 +62,7 @@ app.include_router(admin_precios.router)
 app.include_router(admin_menu.router)
 app.include_router(admin_pagos.router)
 app.include_router(public_pagos.router)
+app.include_router(db_tools.router)
 
 # ===========================
 # Rutas públicas básicas
