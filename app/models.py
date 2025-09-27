@@ -30,24 +30,18 @@ class TimestampMixin:
     )
 
 class TipoMedicamento(Base):
-    """
-    Catálogo de tipos de medicamento (ej: Marca, Bioequivalente, Genérico).
-    Coincide con la tabla:
-      public.tipo_medicamento (
-        id_tipo_medicamento SERIAL PK,
-        codigo VARCHAR(50) NULL,
-        nombre VARCHAR(120) NOT NULL UNIQUE
-      )
-    """
     __tablename__ = "tipo_medicamento"
-    # Nota: si quieres fijar esquema explícito, descomenta:
+    # opcional para evitar problemas de search_path:
     # __table_args__ = {"schema": "public"}
 
     id_tipo_medicamento: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     codigo: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     nombre: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
 
-    # Relación 1–1 con el margen PTS (tabla: public.pts_margenes)
+    # 👇 nuevos (alineados a dev/DDL)
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"), default=True)
+    creado_en: Mapped[Optional["datetime"]] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
+
     margen_pts: Mapped[Optional["PtsMargen"]] = relationship(
         "PtsMargen",
         back_populates="tipo_medicamento",
@@ -59,8 +53,7 @@ class TipoMedicamento(Base):
     )
 
     def __repr__(self) -> str:
-        return f"TipoMedicamento(id={self.id_tipo_medicamento}, codigo={self.codigo!r}, nombre={self.nombre!r})"
-
+        return f"TipoMedicamento(id={self.id_tipo_medicamento}, codigo={self.codigo!r}, nombre={self.nombre!r}, activo={self.activo})"
 
 # (Opcional pero recomendado) Clase PtsMargen para que la relación compile.
 # Debe corresponder a la tabla propuesta `public.pts_margenes`:
@@ -187,7 +180,73 @@ class Bodega(Base):
 
     def __repr__(self) -> str:
         return f"<Bodega {self.id_bodega} {self.nombre!r}>"
-    
+
+# ===========================
+# MENUS E-COMMERCE
+# ===========================
+class WebMenuItem(Base):
+    __tablename__ = "web_menu_items"
+    __table_args__ = (
+        CheckConstraint(
+            "("
+            " (tipo = 'url'        AND url IS NOT NULL AND categoria_id IS NULL AND subcategoria_id IS NULL)"
+            " OR "
+            " (tipo = 'categoria'  AND categoria_id IS NOT NULL AND url IS NULL AND subcategoria_id IS NULL)"
+            " OR "
+            " (tipo = 'subcategoria' AND subcategoria_id IS NOT NULL AND url IS NULL AND categoria_id IS NULL)"
+            ")",
+            name="web_menu_items_tipo_chk",
+        ),
+        Index("ix_web_menu_items_order", "menu", "parent_id", "orden", "id_item"),
+        {"schema": "public"},
+    )
+
+    id_item: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    menu:  Mapped[str] = mapped_column(String(30), nullable=False, server_default=text("'header'"))
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+    tipo:  Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'url'"))
+
+    url:             Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    categoria_id:    Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("public.categorias.id", ondelete="SET NULL"), nullable=True
+    )
+    subcategoria_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("public.subcategorias.id_subcategoria", ondelete="SET NULL"), nullable=True
+    )
+
+    parent_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("public.web_menu_items.id_item", ondelete="CASCADE"), nullable=True
+    )
+    orden:        Mapped[int]  = mapped_column(Integer, nullable=False, server_default=text("0"), default=0)
+    visible:      Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"), default=True)
+    target_blank: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), default=False)
+
+    creado_en:      Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=False), server_default=text("now()"))
+    actualizado_en: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=False), server_default=text("now()"))
+
+    # Relaciones
+    parent:   Mapped[Optional["WebMenuItem"]] = relationship(
+        "WebMenuItem",
+        remote_side="WebMenuItem.id_item",
+        back_populates="children",
+        passive_deletes=True,
+    )
+    children: Mapped[List["WebMenuItem"]] = relationship(
+        "WebMenuItem",
+        back_populates="parent",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        single_parent=True,
+    )
+
+    # Opcionales (si tienes modelos Categoria/Subcategoria)
+    categoria:    Mapped[Optional["Categoria"]] = relationship("Categoria", lazy="joined")
+    subcategoria: Mapped[Optional["Subcategoria"]] = relationship("Subcategoria", lazy="joined")
+
+    def __repr__(self) -> str:
+        return f"<WebMenuItem id={self.id_item} menu={self.menu!r} label={self.label!r} tipo={self.tipo!r}>"
+
 # ===========================
 # CLIENTES
 # ===========================
