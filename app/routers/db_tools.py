@@ -1,20 +1,17 @@
-# app/routers/db_tools.py
 from __future__ import annotations
 
 import os
 from urllib.parse import urlparse, parse_qs
 from typing import Dict, Any
 
-from fastapi import APIRouter, HTTPException, Header, Query, Request
+from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.exc import SQLAlchemyError
 
-# Usa el mismo SessionLocal que el resto de la app
-from app.database import SessionLocal
-
-# -------------------------------------------------------------------
-# URL de Render con todos los datos (fallback si no hay variables)
-# -------------------------------------------------------------------
+# ------------------------------------------------------------
+# Conexion DB (Render exige SSL). Usa PTS_DB_URL/DATABASE_URL
+# o el fallback embebido.
+# ------------------------------------------------------------
 _RENDER_URL = (
     "postgresql+psycopg2://"
     "farmactiva_qa_db_user:DRPbSgZXq91VitevSYRZtrShyEizv6me"
@@ -44,15 +41,28 @@ def _mask(url: str) -> str:
 ENGINE = create_engine(_db_url(), pool_pre_ping=True, future=True)
 router = APIRouter(prefix="/admin/db", tags=["DB"])
 
-def _require_setup_token(hdr_token: str | None, q_token: str | None):
-    """Permite inicializar sin login, pero exige un token de setup."""
-    expected = os.getenv("SETUP_TOKEN", "").strip()
-    provided = (hdr_token or q_token or "").strip()
-    if not expected:
-        raise HTTPException(status_code=500, detail="Falta SETUP_TOKEN en el servidor.")
-    if provided != expected:
-        raise HTTPException(status_code=401, detail="Token de setup inválido.")
+# -------------------- Utils token setup ---------------------
+def _header_token(request: Request) -> str:
+    return (request.headers.get("X-Setup-Token")
+            or request.headers.get("x-setup-token")
+            or "").strip()
 
+def _env_token() -> str:
+    return (os.getenv("SETUP_TOKEN") or "").strip()
+
+def _assert_setup_token(request: Request):
+    env_tok = _env_token()
+    hdr_tok = _header_token(request)
+    if not env_tok:
+        raise HTTPException(status_code=400,
+                            detail="SETUP_TOKEN no está configurado en el entorno.")
+    if hdr_tok != env_tok:
+        # trazas sin exponer el token
+        print("[db-tools] Setup token mismatch "
+              f"(len hdr={len(hdr_tok)}, len env={len(env_tok)})")
+        raise HTTPException(status_code=403, detail="Token de setup inválido.")
+
+# -------------------- Info & ping ----------------------------
 @router.get("/url")
 def db_url_info() -> Dict[str, Any]:
     url = _db_url()
@@ -86,53 +96,44 @@ def db_ping() -> Dict[str, Any]:
 def list_tables(schema: str = "public") -> Dict[str, Any]:
     try:
         insp = inspect(ENGINE)
-        tables = insp.get_table_names(schema=schema)
-        return {"ok": True, "schema": schema, "tables": tables}
+        return {"ok": True, "schema": schema,
+                "tables": insp.get_table_names(schema=schema)}
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail=f"No se pudo listar tablas: {e}")
 
-@router.post("/create-tables")
-def admin_db_create_tables(
-    x_setup_token: str | None = Header(None, convert_underscores=False),
-    token: str | None = Query(None),
-):
-    """
-    Crea todas las tablas declaradas en app.models.Base.metadata.
-    Protegido por cabecera X-Setup-Token o query ?token=...
-    """
-    _require_setup_token(x_setup_token, token)
-
-    db = SessionLocal()
-    try:
-        # Extensión CITEXT (si Render lo permite)
-        try:
-            db.execute(text("CREATE EXTENSION IF NOT EXISTS citext;"))
-            db.commit()
-        except Exception:
-            db.rollback()
-            print("[db-tools] WARN: no se pudo crear extensión citext (permiso o ya existe)")
-
-        # Importa modelos para registrar todas las tablas en el mismo metadata
-        from app import models as m
-        # Forzamos tocar clases con FKs importantes
-        _ = (m.Region, m.Comuna)
-
-        # Ejecuta create_all en el bind de la sesión
-        m.Base.metadata.create_all(bind=db.get_bind())
-        return {"ok": True, "created": True}
-    except Exception as e:
-        db.rollback()
-        print("[db-tools] ERROR create_all:", e)
-        raise HTTPException(status_code=500, detail=f"Error creando tablas: {e}")
-    finally:
-        db.close()
-
 @router.get("/setup-status")
 def setup_status(request: Request):
-    env_token = (os.getenv("SETUP_TOKEN") or "").strip()
-    hdr_token = (request.headers.get("X-Setup-Token") or request.headers.get("x-setup-token") or "").strip()
-    return {
-        "configured": bool(env_token),
-        "header_present": bool(hdr_token),
-        "match": (env_token and hdr_token and env_token == hdr_token)
-    }
+    env_tok = _env_token()
+    hdr_tok = _header_token(request)
+    return {"configured": bool(env_tok),
+            "header_present": bool(hdr_tok),
+            "match": (env_tok and hdr_tok and env_tok == hdr_tok)}
+
+# -------------------- CREATE TABLES --------------------------
+@router.post("/create-tables")   # <- SIN /admin/db extra
+def create_tables(request: Request):
+    # Validación simple por token de setup
+    _assert_setup_token(request)
+
+    # 1) Extensión citext
+    try:
+        with ENGINE.begin() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS citext;"))
+    except Exception as e:
+        print("[db-tools] WARN citext:", e)
+
+    # 2) Registrar modelos y crear tablas
+    try:
+        # IMPORTA TODOS los modelos para que se registren en Base.metadata
+        from app import models as m  # noqa: F401
+
+        # Crear todo
+        m.Base.metadata.create_all(bind=ENGINE)
+
+        # Devolver listado
+        insp = inspect(ENGINE)
+        tables = insp.get_table_names(schema="public")
+        return {"ok": True, "created": True, "tables": tables}
+    except Exception as e:
+        print("[db-tools] ERROR create_all:", e)
+        raise HTTPException(status_code=500, detail=f"Error creando tablas: {e}")
