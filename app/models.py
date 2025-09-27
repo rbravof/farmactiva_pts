@@ -268,54 +268,30 @@ class ClienteDireccion(Base):
 # -------------------------------------------------
 class Region(Base):
     __tablename__ = "regiones"
-    __table_args__ = {"schema": "public"}
 
-    id_region: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nombre: Mapped[str]    = mapped_column(CITEXT(), nullable=False, unique=True)
-    abreviatura: Mapped[str | None] = mapped_column(String(10))
-    orden: Mapped[int]     = mapped_column(SmallInteger, nullable=False, server_default=text("0"))
-    activo: Mapped[bool]   = mapped_column(Boolean, nullable=False, server_default=text("true"))
-    fecha_creacion: Mapped[DateTime] = mapped_column(DateTime(timezone=False), nullable=False, server_default=func.now())
+    id_region: Mapped[int]       = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nombre:    Mapped[str]       = mapped_column(String(120), nullable=False, unique=True)
+    abreviatura: Mapped[Optional[str]] = mapped_column(String(10))
+    orden:     Mapped[int]       = mapped_column(SmallInteger, default=0)
+    activo:    Mapped[bool]      = mapped_column(Boolean, default=True)
+    fecha_creacion: Mapped[Optional["datetime"]] = mapped_column(DateTime(timezone=False), server_default=func.now())
 
-    comunas: Mapped[list["Comuna"]] = relationship(
-        "Comuna",
-        back_populates="region",
-        lazy="selectin"
-    )
+    comunas: Mapped[List["Comuna"]] = relationship("Comuna", back_populates="region", cascade="all, delete-orphan")
 
-    def __repr__(self) -> str:
-        return f"<Region id={self.id_region} nombre={self.nombre!r}>"
-
-
-# -------------------------------------------------
-# Comunas
-# -------------------------------------------------
 class Comuna(Base):
     __tablename__ = "comunas"
     __table_args__ = (
         UniqueConstraint("id_region", "nombre", name="comunas_region_nombre_uk"),
-        {"schema": "public"},
     )
 
-    id_comuna: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    id_region: Mapped[int] = mapped_column(
-        Integer,
-        ForeignKey("public.regiones.id_region", ondelete="CASCADE"),
-        nullable=False,
-    )
-    nombre: Mapped[str] = mapped_column(CITEXT(), nullable=False)
-    orden: Mapped[int]  = mapped_column(SmallInteger, nullable=False, server_default=text("0"))
-    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
-    fecha_creacion: Mapped[DateTime] = mapped_column(DateTime(timezone=False), nullable=False, server_default=func.now())
+    id_comuna: Mapped[int]       = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id_region: Mapped[int]       = mapped_column(Integer, ForeignKey("regiones.id_region", ondelete="CASCADE"), nullable=False)
+    nombre:    Mapped[str]       = mapped_column(String(120), nullable=False)
+    orden:     Mapped[int]       = mapped_column(SmallInteger, default=0)
+    activo:    Mapped[bool]      = mapped_column(Boolean, default=True)
+    fecha_creacion: Mapped[Optional["datetime"]] = mapped_column(DateTime(timezone=False), server_default=func.now())
 
-    region: Mapped["Region"] = relationship(
-        "Region",
-        back_populates="comunas",
-        lazy="joined"
-    )
-
-    def __repr__(self) -> str:
-        return f"<Comuna id={self.id_comuna} nombre={self.nombre!r} region={self.id_region}>"
+    region: Mapped["Region"] = relationship("Region", back_populates="comunas")
 
 # ===========================
 # ENVIOS & TARIFAS
