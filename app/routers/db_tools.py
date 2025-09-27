@@ -11,7 +11,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies import require_admin
+from app.routers.admin_security import require_admin
 
 # -------------------------------------------------------------------
 # URL de Render con todos los datos (fallback si no hay variables)
