@@ -5,7 +5,7 @@ import os
 from urllib.parse import urlparse, parse_qs
 from typing import Dict, Any
 
-from fastapi import APIRouter, HTTPException, Header, Query
+from fastapi import APIRouter, HTTPException, Header, Query, Request
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -126,3 +126,13 @@ def admin_db_create_tables(
         raise HTTPException(status_code=500, detail=f"Error creando tablas: {e}")
     finally:
         db.close()
+
+@router.get("/setup-status")
+def setup_status(request: Request):
+    env_token = (os.getenv("SETUP_TOKEN") or "").strip()
+    hdr_token = (request.headers.get("X-Setup-Token") or request.headers.get("x-setup-token") or "").strip()
+    return {
+        "configured": bool(env_token),
+        "header_present": bool(hdr_token),
+        "match": (env_token and hdr_token and env_token == hdr_token)
+    }
