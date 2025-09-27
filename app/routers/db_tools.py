@@ -5,7 +5,7 @@ import os
 from urllib.parse import urlparse, parse_qs
 from typing import Dict, Any
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -130,6 +130,42 @@ def admin_db_create_tables(
         bind = db.get_bind()
         m.Base.metadata.create_all(bind=bind)
         return {"ok": True, "created": True}
+    except Exception as e:
+        print("[db-tools] ERROR create_all:", e)
+        raise HTTPException(status_code=500, detail=f"Error creando tablas: {e}")
+
+@router.post("/bootstrap")
+def admin_db_bootstrap(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Bootstrap inicial para crear tablas sin login de admin.
+    Protegido por un token en header 'X-Setup-Token' o query ?token=...
+    Debe coincidir con la var de entorno DB_BOOTSTRAP_TOKEN (o ADMIN_BOOTSTRAP_TOKEN).
+    """
+    token = request.headers.get("X-Setup-Token") or request.query_params.get("token")
+    expected = os.getenv("DB_BOOTSTRAP_TOKEN") or os.getenv("ADMIN_BOOTSTRAP_TOKEN")
+    if not expected or token != expected:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+    # 1) Extensión CITEXT (si hay permisos)
+    try:
+        db.execute(text("CREATE EXTENSION IF NOT EXISTS citext;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+        print("[db-tools] WARN: no se pudo crear extensión citext")
+
+    # 2) Registrar modelos
+    from app import models as m
+    _ = (m.Region, m.Comuna, m.Bodega)  # “tocar” relaciones clave
+
+    # 3) Crear tablas
+    try:
+        bind = db.get_bind()
+        m.Base.metadata.create_all(bind=bind)
+        return {"ok": True, "created": True, "via": "bootstrap"}
     except Exception as e:
         print("[db-tools] ERROR create_all:", e)
         raise HTTPException(status_code=500, detail=f"Error creando tablas: {e}")
