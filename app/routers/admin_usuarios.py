@@ -56,6 +56,17 @@ def _normalize_username(u: str) -> str:
     return u.lower()
 
 # ===================== Listado =====================
+from typing import Optional
+from fastapi import APIRouter, Depends, Request, Query
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+from app.db import get_db
+from app.routers.admin_security import require_admin
+
+ALLOWED_ROLES = {"admin", "qf", "aux", "transportista"}
+
+router = APIRouter(prefix="/admin/usuarios", tags=["Usuarios & Roles"])
+
 @router.get("", response_class=HTMLResponse)
 def usuarios_list(
     request: Request,
@@ -65,43 +76,44 @@ def usuarios_list(
     rol: Optional[str] = Query(None),        # admin | qf | aux | transportista
     estado: Optional[str] = Query("all"),    # all | activos | inactivos
 ):
-    # subconsulta: ¿es admin?
-    is_admin_sq = (
-        select(Administrador.activo)
-        .where(Administrador.usuario == Usuario.usuario, Administrador.activo.is_(True))
-        .limit(1)
-        .scalar_subquery()
-    )
-
-    # subconsulta: rol (primera coincidencia en usuario_roles)
-    rol_sq = (
-        select(UsuarioRol.rol)
-        .where(UsuarioRol.id_usuario == Usuario.id)
-        .limit(1)
-        .scalar_subquery()
-    )
-
-    # 1 fila por usuario (sin JOINs que dupliquen)
-    stmt = (
-        select(
-            Usuario.id,
-            Usuario.usuario,
-            Usuario.rut,
-            Usuario.nombre,
-            Usuario.activo,
-            is_admin_sq.label("is_admin"),
-            rol_sq.label("rol_db"),
-        )
-        .order_by(asc(Usuario.nombre), asc(Usuario.usuario))
-    )
-
+    # Traemos una fila por usuario, con:
+    # - is_admin por EXISTS sobre administradores
+    # - roles_csv como string_agg de usuario_roles.rol
+    stmt = text("""
+        SELECT
+            u.id,
+            u.usuario,
+            u.rut,
+            u.nombre,
+            u.activo,
+            EXISTS (
+                SELECT 1
+                FROM public.administradores a
+                WHERE a.usuario = u.usuario
+                  AND a.activo IS TRUE
+            ) AS is_admin,
+            COALESCE(string_agg(ur.rol, ',' ORDER BY ur.rol), '') AS roles_csv
+        FROM public.usuarios u
+        LEFT JOIN public.usuario_roles ur ON ur.id_usuario = u.id
+        GROUP BY u.id, u.usuario, u.rut, u.nombre, u.activo
+        ORDER BY u.nombre ASC, u.usuario ASC
+    """)
     rows = db.execute(stmt).mappings().all()
 
     usuarios = []
     term = (q or "").strip().lower()
 
+    # prioridad de rol cuando NO es admin
+    prioridad = ["qf", "aux", "transportista"]
+
     for r in rows:
-        rol_calc = "admin" if r["is_admin"] else (r["rol_db"] if r["rol_db"] in ALLOWED_ROLES else "aux")
+        # calcular rol efectivo
+        if r["is_admin"]:
+            rol_calc = "admin"
+        else:
+            roles = [x for x in (r.get("roles_csv") or "").split(",") if x]
+            # elige el primero que aparezca según prioridad
+            rol_calc = next((x for x in prioridad if x in roles), "aux")
 
         # filtros
         if rol and rol_calc != rol:
@@ -111,11 +123,10 @@ def usuarios_list(
         if estado == "inactivos" and r["activo"]:
             continue
         if term:
-            if not (
-                (r["usuario"] and term in r["usuario"].lower())
-                or (r["nombre"] and term in (r["nombre"] or "").lower())
-                or (r["rut"] and term in (r["rut"] or "").lower())
-            ):
+            u = (r["usuario"] or "").lower()
+            n = (r["nombre"] or "").lower()
+            rt = (r["rut"] or "").lower()
+            if term not in u and term not in n and term not in rt:
                 continue
 
         usuarios.append(
@@ -140,6 +151,7 @@ def usuarios_list(
             "estado": estado or "all",
         },
     )
+
 
 # ===================== Crear =====================
 @router.get("/nuevo")
