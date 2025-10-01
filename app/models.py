@@ -1,11 +1,11 @@
 # app/models.py
 from __future__ import annotations
 from typing import List, Optional
-from datetime import datetime
-from decimal import Decimal  # <-- NUEVO
-
+from datetime import datetime, date
+from decimal import Decimal
+import sqlalchemy as sa
 from sqlalchemy import (
-    DateTime, func, JSON,
+    DateTime, func, JSON, Float,
     Boolean, CheckConstraint, Column, ForeignKey, Integer, Numeric, String, Text,
     TIMESTAMP, UniqueConstraint, text, SmallInteger, Index, BigInteger
 )
@@ -13,6 +13,7 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column  # <-- sin declar
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import CITEXT
+from sqlalchemy.dialects.postgresql import ENUM as PGEnum
 
 from app.database import Base  # <-- usa la Base central del proyecto
 
@@ -28,6 +29,74 @@ class TimestampMixin:
     fecha_actualizacion: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
     )
+
+class Rol(Base):
+    __tablename__ = "roles"
+
+    id_rol: Mapped[int]       = mapped_column(SmallInteger, primary_key=True, autoincrement=True)
+    codigo: Mapped[str]       = mapped_column(String(30), nullable=False, unique=True, index=True)  # 'admin','qf','aux','transportista'
+    nombre: Mapped[str]       = mapped_column(String(80), nullable=False)
+    activo: Mapped[bool]      = mapped_column(Boolean, nullable=False, server_default=text("true"), default=True)
+    superuser: Mapped[bool]   = mapped_column(Boolean, nullable=False, server_default=text("false"), default=False)
+    prioridad: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+
+    # Relación con usuarios (vía tabla puente usuario_roles)
+    usuario_roles: Mapped[list["UsuarioRol"]] = relationship(
+        "UsuarioRol", back_populates="rol", cascade="all, delete-orphan"
+    )
+
+    # Relación con permisos (vía tabla puente rol_permisos)
+    rol_permisos: Mapped[list["RolPermiso"]] = relationship(
+        "RolPermiso", back_populates="rol", cascade="all, delete-orphan"
+    )
+
+    # Acceso directo a permisos (viewonly: usa rol_permisos para escribir)
+    permisos: Mapped[list["Permiso"]] = relationship(
+        "Permiso",
+        secondary="rol_permisos",
+        primaryjoin="Rol.id_rol==RolPermiso.id_rol",
+        secondaryjoin="Permiso.id_permiso==RolPermiso.id_permiso",
+        viewonly=True,
+    )
+
+    def __repr__(self) -> str:
+        return f"<Rol {self.codigo!r} superuser={self.superuser} activo={self.activo}>"
+
+
+class Permiso(Base):
+    __tablename__ = "permisos"
+
+    id_permiso: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=True)
+    clave: Mapped[str]      = mapped_column(String(80), nullable=False, unique=True, index=True)   # ej: 'menu:pedidos'
+    nombre: Mapped[str]     = mapped_column(String(120), nullable=False)
+    tipo: Mapped[str]       = mapped_column(String(16), nullable=False)  # 'menu' | 'ruta' | 'accion'
+    recurso: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    activo: Mapped[bool]    = mapped_column(Boolean, nullable=False, server_default=text("true"), default=True)
+
+    __table_args__ = (
+        CheckConstraint("tipo IN ('menu','ruta','accion')", name="ck_permisos_tipo"),
+    )
+
+    rol_permisos: Mapped[list["RolPermiso"]] = relationship(
+        "RolPermiso", back_populates="permiso", cascade="all, delete-orphan"
+    )
+
+    def __repr__(self) -> str:
+        return f"<Permiso {self.clave!r} tipo={self.tipo}>"
+
+
+class RolPermiso(Base):
+    __tablename__ = "rol_permisos"
+
+    id_rol: Mapped[int]      = mapped_column(SmallInteger, ForeignKey("roles.id_rol", ondelete="CASCADE"), primary_key=True)
+    id_permiso: Mapped[int]  = mapped_column(SmallInteger, ForeignKey("permisos.id_permiso", ondelete="CASCADE"), primary_key=True)
+    allow: Mapped[bool]      = mapped_column(Boolean, nullable=False, server_default=text("true"), default=True)
+
+    rol: Mapped["Rol"]       = relationship("Rol", back_populates="rol_permisos")
+    permiso: Mapped["Permiso"] = relationship("Permiso", back_populates="rol_permisos")
+
+    def __repr__(self) -> str:
+        return f"<RolPermiso rol={self.id_rol} perm={self.id_permiso} allow={self.allow}>"
 
 class TipoMedicamento(Base):
     __tablename__ = "tipo_medicamento"
@@ -188,17 +257,13 @@ class WebMenuItem(Base):
     __tablename__ = "web_menu_items"
     __table_args__ = (
         CheckConstraint(
-            "("
-            " (tipo = 'url'        AND url IS NOT NULL AND categoria_id IS NULL AND subcategoria_id IS NULL)"
-            " OR "
-            " (tipo = 'categoria'  AND categoria_id IS NOT NULL AND url IS NULL AND subcategoria_id IS NULL)"
-            " OR "
-            " (tipo = 'subcategoria' AND subcategoria_id IS NOT NULL AND url IS NULL AND categoria_id IS NULL)"
-            ")",
+            "(tipo = 'url'        AND url IS NOT NULL AND categoria_id IS NULL AND subcategoria_id IS NULL) OR "
+            "(tipo = 'categoria'  AND categoria_id IS NOT NULL AND url IS NULL AND subcategoria_id IS NULL) OR "
+            "(tipo = 'subcategoria' AND subcategoria_id IS NOT NULL AND url IS NULL AND categoria_id IS NULL)",
             name="web_menu_items_tipo_chk",
         ),
         Index("ix_web_menu_items_order", "menu", "parent_id", "orden", "id_item"),
-        {"schema": "public"},
+        {"schema": "public"},  # si tu tabla vive en 'public', esto está OK
     )
 
     id_item: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -207,17 +272,20 @@ class WebMenuItem(Base):
     label: Mapped[str] = mapped_column(String(120), nullable=False)
     tipo:  Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'url'"))
 
-    url:             Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    categoria_id:    Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("public.categorias.id", ondelete="SET NULL"), nullable=True
+    url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # 👇 OJO: sin 'public.' para que coincida con los modelos Categoria/Subcategoria
+    categoria_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("categorias.id", ondelete="SET NULL"), nullable=True
     )
     subcategoria_id: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("public.subcategorias.id_subcategoria", ondelete="SET NULL"), nullable=True
+        Integer, ForeignKey("subcategorias.id_subcategoria", ondelete="SET NULL"), nullable=True
     )
 
     parent_id: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("public.web_menu_items.id_item", ondelete="CASCADE"), nullable=True
+        Integer, ForeignKey("public.web_menu_items.id_item", ondelete="CASCADE"), nullable=True  # <- corregido con schema
     )
+
     orden:        Mapped[int]  = mapped_column(Integer, nullable=False, server_default=text("0"), default=0)
     visible:      Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"), default=True)
     target_blank: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), default=False)
@@ -225,8 +293,8 @@ class WebMenuItem(Base):
     creado_en:      Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=False), server_default=text("now()"))
     actualizado_en: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=False), server_default=text("now()"))
 
-    # Relaciones
-    parent:   Mapped[Optional["WebMenuItem"]] = relationship(
+    # Relaciones (explícitas para evitar ambigüedad)
+    parent: Mapped[Optional["WebMenuItem"]] = relationship(
         "WebMenuItem",
         remote_side="WebMenuItem.id_item",
         back_populates="children",
@@ -240,9 +308,18 @@ class WebMenuItem(Base):
         single_parent=True,
     )
 
-    # Opcionales (si tienes modelos Categoria/Subcategoria)
-    categoria:    Mapped[Optional["Categoria"]] = relationship("Categoria", lazy="joined")
-    subcategoria: Mapped[Optional["Subcategoria"]] = relationship("Subcategoria", lazy="joined")
+    categoria: Mapped[Optional["Categoria"]] = relationship(
+        "Categoria",
+        lazy="joined",
+        primaryjoin="WebMenuItem.categoria_id == Categoria.id",
+        foreign_keys="[WebMenuItem.categoria_id]",
+    )
+    subcategoria: Mapped[Optional["Subcategoria"]] = relationship(
+        "Subcategoria",
+        lazy="joined",
+        primaryjoin="WebMenuItem.subcategoria_id == Subcategoria.id_subcategoria",
+        foreign_keys="[WebMenuItem.subcategoria_id]",
+    )
 
     def __repr__(self) -> str:
         return f"<WebMenuItem id={self.id_item} menu={self.menu!r} label={self.label!r} tipo={self.tipo!r}>"
@@ -355,6 +432,87 @@ class Comuna(Base):
 # ===========================
 # ENVIOS & TARIFAS
 # ===========================
+# --- NUEVO: Transportista, Envio, EnvioEvento ---
+class Transportista(Base):
+    __tablename__ = "transportistas"
+    id_transportista: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nombre: Mapped[str] = mapped_column(String(120), nullable=False)
+    rut: Mapped[str] = mapped_column(String(20), nullable=True, unique=True)
+    fono: Mapped[str | None] = mapped_column(String(40))
+    email: Mapped[str | None] = mapped_column(String(120))
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"), default=True)
+
+    # si un transportista inicia sesión con un usuario del sistema (opcional)
+    usuario: Mapped[str | None] = mapped_column(String(80), ForeignKey("usuarios.usuario", ondelete="SET NULL"))
+
+    creado_en: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+
+    envios: Mapped[list["Envio"]] = relationship("Envio", back_populates="transportista", cascade="all, delete-orphan")
+
+    def __repr__(self) -> str:
+        return f"<Transportista id={self.id_transportista} nombre={self.nombre!r} activo={self.activo}>"
+
+class Envio(Base):
+    __tablename__ = "envios"
+    __table_args__ = (
+        CheckConstraint(
+            "estado IN ('creado','asignado','retirado','en_transito','fallido','entregado','devuelto')",
+            name="envios_estado_chk",
+        ),
+        Index("ix_envios_pedido", "id_pedido"),
+        Index("ix_envios_transportista", "id_transportista"),
+    )
+
+    id_envio: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id_pedido: Mapped[int] = mapped_column(Integer, ForeignKey("pedidos.id_pedido", ondelete="CASCADE"), nullable=False)
+    id_transportista: Mapped[int | None] = mapped_column(Integer, ForeignKey("transportistas.id_transportista", ondelete="SET NULL"))
+
+    # tokens: público para tracking cliente; privado/operativo para escaneo interno
+    tracking_token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, default=lambda: uuid.uuid4().hex)
+    scan_token:     Mapped[str] = mapped_column(String(32), unique=True, nullable=False, default=lambda: uuid.uuid4().hex[:24])
+
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'creado'"))
+    creado_en: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    actualizado_en: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    transportista: Mapped["Transportista"] = relationship("Transportista", back_populates="envios")
+    eventos: Mapped[list["EnvioEvento"]] = relationship(
+        "EnvioEvento", back_populates="envio", cascade="all, delete-orphan", order_by="EnvioEvento.creado_en"
+    )
+
+    def __repr__(self) -> str:
+        return f"<Envio id={self.id_envio} pedido={self.id_pedido} estado={self.estado!r}>"
+
+class EnvioEvento(Base):
+    __tablename__ = "envio_eventos"
+    __table_args__ = (
+        CheckConstraint(
+            "estado IN ('asignado','retirado','en_transito','fallido','entregado','devuelto')",
+            name="envio_eventos_estado_chk",
+        ),
+        Index("ix_envio_eventos_envio", "id_envio"),
+    )
+
+    id_evento: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id_envio: Mapped[int] = mapped_column(Integer, ForeignKey("envios.id_envio", ondelete="CASCADE"), nullable=False)
+
+    estado: Mapped[str] = mapped_column(String(20), nullable=False)
+    nota: Mapped[str | None] = mapped_column(Text)
+    lat: Mapped[float | None] = mapped_column(Numeric(9,6))
+    lng: Mapped[float | None] = mapped_column(Numeric(9,6))
+    direccion_text: Mapped[str | None] = mapped_column(String(240))
+    evidencia_url: Mapped[str | None] = mapped_column(String(240))  # foto POD
+    firma_svg: Mapped[str | None] = mapped_column(Text)
+    recibido_por: Mapped[str | None] = mapped_column(String(120))
+    actor: Mapped[str | None] = mapped_column(String(30))  # 'transportista' | 'admin' | 'sistema'
+
+    creado_en: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+
+    envio: Mapped["Envio"] = relationship("Envio", back_populates="eventos")
+
+    def __repr__(self) -> str:
+        return f"<EnvioEvento id={self.id_evento} envio={self.id_envio} {self.estado!r}>"
+
 # --- Tipos de envío y Tarifas ---
 class TipoEnvio(Base):
     __tablename__ = "tipos_envio"
@@ -467,6 +625,12 @@ class Pedido(Base):
         lazy="selectin",
     )
 
+    historial_estados: Mapped[List["PedidoEstadoHistorial"]] = relationship(
+        "PedidoEstadoHistorial",
+        back_populates="pedido",
+        cascade="all, delete-orphan",
+    )
+
     def __repr__(self) -> str:
         return f"<Pedido {self.id_pedido} #{self.numero} estado={self.estado_codigo}>"
 
@@ -536,6 +700,66 @@ class PedidoHistorial(Base):
 
     def __repr__(self) -> str:
         return f"<PedidoHistorial {self.id_historial} {self.estado_origen}->{self.estado_destino}>"
+
+class PedidoEstadoHistorial(Base):
+    __tablename__ = "pedido_estado_historial"
+    # __table_args__ = {"schema": "public"}  # <- SOLO si usas esquema explícito en todos
+
+    id_historial: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+
+    # FK al pedido (CRÍTICO para que el relationship funcione)
+    id_pedido: Mapped[int] = mapped_column(
+        BigInteger,  # usa BigInteger si tu PK de pedidos es bigint; si es integer, pon Integer
+        ForeignKey("pedidos.id_pedido", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    # FK al estado destino
+    estado_destino: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("pedido_estados.id_estado"),
+        nullable=False,
+    )
+
+    # resto de columnas
+    nota: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("''"))
+    audiencia: Mapped[str] = mapped_column(
+        PGEnum(name="audiencia_nota", create_type=False),
+        nullable=False,
+        server_default=text("'NEXT_ROLE'::audiencia_nota"),
+    )
+    destinatario_rol: Mapped[Optional[str]] = mapped_column(String(30))
+    created_by: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("usuarios.id", ondelete="SET NULL")
+    )
+    creado_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False), nullable=False, server_default=func.now()
+    )
+
+    # Relaciones (explicita foreign_keys y primaryjoin para evitar ambigüedades)
+    pedido: Mapped["Pedido"] = relationship(
+        "Pedido",
+        primaryjoin="PedidoEstadoHistorial.id_pedido == Pedido.id_pedido",
+        foreign_keys=[id_pedido],
+        back_populates="historial_estados",
+    )
+    estado: Mapped["PedidoEstado"] = relationship(
+        "PedidoEstado",
+        primaryjoin="PedidoEstadoHistorial.estado_destino == PedidoEstado.id_estado",
+        foreign_keys=[estado_destino],
+        lazy="joined",
+    )
+    autor: Mapped[Optional["Usuario"]] = relationship(
+        "Usuario",
+        primaryjoin="PedidoEstadoHistorial.created_by == Usuario.id",
+        foreign_keys=[created_by],
+        lazy="joined",
+    )
+
+    __table_args__ = (
+        Index("idx_hist_pedido_fecha", "id_pedido", "creado_en"),
+        # {"schema": "public"}  # <- SOLO si usas esquema explícito en todos
+    )
 
 # ===========================
 # PEDIDO · Notas
@@ -651,6 +875,13 @@ class PedidoPago(Base):
     proveedor_payment_id: Mapped[Optional[str]] = mapped_column(Text)
     estado_detalle:       Mapped[Optional[str]] = mapped_column(String(80))
 
+    pedido: Mapped["Pedido"] = relationship(
+        "Pedido",
+        back_populates="pagos",
+        primaryjoin="PedidoPago.id_pedido == Pedido.id_pedido",
+        lazy="selectin",
+    )
+
     eventos: Mapped[List["PedidoPagoEvento"]] = relationship(
         "PedidoPagoEvento",
         back_populates="pago",
@@ -700,8 +931,7 @@ class PedidoPagoEvento(Base):
 class Usuario(Base):
     """
     Usuarios del sistema (login). Las contraseñas pueden estar en texto
-    plano para desarrollo o en hash bcrypt en producción (tu verify_password
-    ya contempla ambos casos).
+    plano para desarrollo o en hash bcrypt en producción.
     """
     __tablename__ = "usuarios"
 
@@ -709,29 +939,68 @@ class Usuario(Base):
     usuario: Mapped[str] = mapped_column(String(80), nullable=False, unique=True, index=True)
     rut: Mapped[str] = mapped_column(String(20), nullable=False, unique=True, index=True)
     contrasena: Mapped[str] = mapped_column(Text, nullable=False)  # hash o texto según entorno
-    nombre: Mapped[str | None] = mapped_column(String(120))
+    nombre: Mapped[Optional[str]] = mapped_column(String(120))
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"), default=True)
 
     fecha_creacion: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 
-    # Relación con Administrador (opcional: para navegar desde usuario → admin)
-    admin: Mapped["Administrador"] = relationship(
-        "Administrador", back_populates="usuario_ref", uselist=False
+    # Relación con Administrador (1–1 opcional)
+    admin: Mapped[Optional["Administrador"]] = relationship(
+        "Administrador",
+        back_populates="usuario_ref",
+        uselist=False,
+    )
+
+    # Relación con rol asignado (1–1 opcional)
+    rol_ref: Mapped[Optional["UsuarioRol"]] = relationship(
+        "UsuarioRol",
+        back_populates="usuario",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     __table_args__ = (
-        UniqueConstraint("usuario", name="uq_usuarios_usuario"),
-        UniqueConstraint("rut", name="uq_usuarios_rut"),
+        UniqueConstraint("usuario", name="usuarios_usuario_key"),
+        UniqueConstraint("rut", name="usuarios_rut_key"),
         Index("idx_usuarios_usuario_lower", text("lower(usuario)")),
     )
 
     def __repr__(self) -> str:
         return f"<Usuario id={self.id} usuario={self.usuario!r} activo={self.activo}>"
 
+
     # Helpers opcionales (si quisieras setear hash aquí):
     # def set_password(self, hashed_or_plain: str) -> None:
     #     self.contrasena = hashed_or_plain  # deja el hashing a un servicio externo si prefieres
 
+class UsuarioRol(Base):
+    __tablename__ = "usuario_roles"
+
+    # Si tu tabla tiene una sola fila por usuario, id_usuario puede ser PK.
+    # Si permites múltiples roles por usuario, usa PK compuesto (id_usuario, id_rol).
+    id_usuario: Mapped[int]  = mapped_column(ForeignKey("usuarios.id", ondelete="CASCADE"), primary_key=True)
+
+    # Campo nuevo que referencia catálogo de roles
+    id_rol: Mapped[int]      = mapped_column(
+        SmallInteger,
+        ForeignKey("roles.id_rol", ondelete="CASCADE"),
+        primary_key=True,   # <- si permitirás múltiples roles por usuario
+        # si SOLO 1 rol por usuario: quita primary_key aquí y añade UniqueConstraint('id_usuario')
+        nullable=True       # pon False cuando completes la migración
+    )
+
+    # Legacy (opcional mientras migras): 'admin' | 'qf' | 'aux' | 'transportista'
+    rol: Mapped[str | None]  = mapped_column(String(30), nullable=True)
+
+    creado_en: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=text("now()"))
+
+    # Relaciones
+    usuario: Mapped["Usuario"] = relationship("Usuario", back_populates="rol_ref")
+    rol: Mapped["Rol"]         = relationship("Rol")
+
+    def __repr__(self) -> str:
+        return f"<UsuarioRol user_id={self.id_usuario} id_rol={self.id_rol} legacy={self.rol!r}>"
 
 class Administrador(Base):
     """
@@ -892,6 +1161,18 @@ class ProductoCategoria(Base):
         primary_key=True,
     )
 
+    producto: Mapped["Producto"] = relationship(
+        "Producto",
+        back_populates="categorias_rel",
+        primaryjoin="ProductoCategoria.id_producto == Producto.id_producto",
+        lazy="selectin",
+    )
+    categoria: Mapped["Categoria"] = relationship(
+        "Categoria",
+        back_populates="productos_rel",
+        primaryjoin="ProductoCategoria.id_categoria == Categoria.id",
+        lazy="selectin",
+    )
     # Nota: no declaramos relaciones aquí porque el modelo actual usa FK directa en Producto (categoria_id).
     # Si más adelante necesitas navegar la N:N, podemos agregar relationships viewonly.
     def __repr__(self) -> str:  # pragma: no cover
@@ -1008,7 +1289,14 @@ class Producto(Base):
         lazy="selectin",
     )
 
-    precios: Mapped[list["Precio"]] = relationship("Precio", back_populates="producto", cascade="all, delete-orphan")
+    precios: Mapped[list["Precio"]] = relationship(
+        "Precio",
+        back_populates="producto",
+        primaryjoin="Precio.id_producto == Producto.id_producto",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        passive_deletes=True,
+    )
 
     # Alias opcional para “nombre”
     @hybrid_property
@@ -1151,12 +1439,11 @@ class EtiquetaProducto(Base):
 # ---------------------------------------
 class ListaPrecio(Base):
     __tablename__ = "listas_precios"
-    __table_args__ = {"schema": "public"}
 
     id_lista: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     nombre:   Mapped[str] = mapped_column(String, nullable=False)
     slug:     Mapped[str] = mapped_column(String, nullable=False, unique=True)
-    activa:   Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"), default=True)
+    activa:   Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"), default=True)
 
     precios: Mapped[list["Precio"]] = relationship(
         "Precio", back_populates="lista", cascade="all, delete-orphan"
@@ -1170,14 +1457,13 @@ class ListaPrecio(Base):
 # -------------------------
 class Precio(Base):
     __tablename__ = "precios"
-    __table_args__ = {"schema": "public"}
 
     id_precio:     Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     id_producto:   Mapped[int] = mapped_column(
-        Integer, ForeignKey("public.productos.id_producto", ondelete="CASCADE"), nullable=False
+        Integer, ForeignKey("productos.id_producto", ondelete="CASCADE"), nullable=False
     )
     id_lista:      Mapped[int] = mapped_column(
-        Integer, ForeignKey("public.listas_precios.id_lista", ondelete="CASCADE"), nullable=False
+        Integer, ForeignKey("listas_precios.id_lista", ondelete="CASCADE"), nullable=False
     )
     precio_bruto:  Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     iva_tasa:      Mapped[float] = mapped_column(Numeric(5, 2), nullable=False, server_default=text("19.0"))
@@ -1190,7 +1476,12 @@ class Precio(Base):
     # Relaciones
     lista:     Mapped["ListaPrecio"] = relationship("ListaPrecio", back_populates="precios")
     # Asumiendo que tu modelo Producto se llama 'Producto' y está en schema public
-    producto:  Mapped["Producto"] = relationship("Producto", back_populates="precios", viewonly=True)
+    producto: Mapped["Producto"]    = relationship(
+        "Producto",
+        back_populates="precios",
+        primaryjoin="Precio.id_producto == Producto.id_producto",
+        lazy="selectin",
+    )
 
     def __repr__(self) -> str:
         return f"<Precio id={self.id_precio} prod={self.id_producto} lista={self.id_lista} bruto={self.precio_bruto}>"
@@ -1273,6 +1564,133 @@ class InventarioVariante(Base):
     def __repr__(self) -> str:
         return f"<InventarioVariante var={self.id_variante} suc={self.id_sucursal} cant={self.cantidad}>"
 
+# ---------------------------------------
+# Trasnportistas
+# ---------------------------------------
+class PedidoAsignacion(Base):
+    __tablename__ = "pedido_asignaciones"
+    id_asignacion: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id_pedido: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    id_transportista: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    id_sucursal: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    estado_logistico: Mapped[str] = mapped_column(Text, default="ASIGNADO")
+    asignado_por: Mapped[str | None] = mapped_column(Text)
+    tracking_ext: Mapped[str | None] = mapped_column(Text)
+    obs: Mapped[str | None] = mapped_column(Text)
+    activo: Mapped[bool] = mapped_column(Boolean, default=True)
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    actualizado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+class PedidoEnvioEvento(Base):
+    __tablename__ = "pedido_envio_eventos"
+    id_evento: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id_pedido: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    id_asignacion: Mapped[int | None] = mapped_column(BigInteger)
+    estado: Mapped[str] = mapped_column(Text, nullable=False)
+    nota: Mapped[str | None] = mapped_column(Text)
+    actor: Mapped[str | None] = mapped_column(Text)
+    actor_usuario: Mapped[str | None] = mapped_column(Text)
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+class Ruta(Base):
+    __tablename__ = "rutas"
+    id_ruta: Mapped[int] = mapped_column(sa.BigInteger, primary_key=True, autoincrement=True)
+    fecha: Mapped[date] = mapped_column(sa.Date, default=date.today)               # ← antes Date
+    id_transportista: Mapped[int | None] = mapped_column(sa.BigInteger)
+    id_sucursal: Mapped[int | None] = mapped_column(sa.BigInteger)
+    zona: Mapped[str | None] = mapped_column(sa.Text)
+    capacidad_max: Mapped[int | None] = mapped_column(sa.Integer)
+    estado: Mapped[str] = mapped_column(sa.Text, default="PLANIFICADA")
+    creado_en: Mapped[datetime] = mapped_column(sa.DateTime, default=datetime.utcnow) 
+
+class RutaDetalle(Base):
+    __tablename__ = "rutas_detalle"
+    id_ruta_det: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id_ruta: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    id_pedido: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    orden: Mapped[int | None] = mapped_column(Integer)
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+class GpsPosicion(Base):
+    __tablename__ = "gps_posiciones"
+    id_pos: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id_transportista: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    id_asignacion: Mapped[int | None] = mapped_column(BigInteger)
+    id_pedido: Mapped[int | None] = mapped_column(BigInteger)
+    lat: Mapped[float] = mapped_column(Float, nullable=False)   # ← antes Double
+    lon: Mapped[float] = mapped_column(Float, nullable=False)   # ← antes Double
+    acc_m: Mapped[float | None] = mapped_column(Float)          # ← antes Double
+    fuente: Mapped[str | None] = mapped_column(Text)
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+class TempRegistro(Base):
+    __tablename__ = "temp_registros"
+    id_temp: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id_asignacion: Mapped[int | None] = mapped_column(BigInteger)
+    sensor_id: Mapped[str | None] = mapped_column(Text)
+    celsius: Mapped[Decimal] = mapped_column(Numeric(6,2), nullable=False)
+    dentro_rango: Mapped[bool | None] = mapped_column(Boolean)
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+class Incidencia(Base):
+    __tablename__ = "incidencias"
+    id_incidencia: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id_asignacion: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    tipo: Mapped[str] = mapped_column(Text, nullable=False)
+    descripcion: Mapped[str | None] = mapped_column(Text)
+    foto_url: Mapped[str | None] = mapped_column(Text)
+    creado_por: Mapped[str | None] = mapped_column(Text)
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+class Devolucion(Base):
+    __tablename__ = "devoluciones"
+    id_devolucion: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id_asignacion: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    motivo: Mapped[str | None] = mapped_column(Text)
+    foto_url: Mapped[str | None] = mapped_column(Text)
+    creado_por: Mapped[str | None] = mapped_column(Text)
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+class FirmaEntrega(Base):
+    __tablename__ = "firmas_entrega"
+    id_firma: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id_asignacion: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    receptor_nombre: Mapped[str | None] = mapped_column(Text)
+    imagen_url: Mapped[str | None] = mapped_column(Text)
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+class TransportistaDocumento(Base):
+    __tablename__ = "transportista_documentos"
+    id_doc: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id_transportista: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    tipo: Mapped[str] = mapped_column(Text, nullable=False)
+    numero: Mapped[str | None] = mapped_column(Text)
+    emisor: Mapped[str | None] = mapped_column(Text)
+    fecha_emision: Mapped[date | None] = mapped_column(sa.Date)
+    fecha_vencimiento: Mapped[date | None] = mapped_column(sa.Date)
+    archivo_url: Mapped[str | None] = mapped_column(Text)
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+class ChecklistTransporte(Base):
+    __tablename__ = "checklists_transporte"
+    id_check: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id_asignacion: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    tipo: Mapped[str] = mapped_column(Text, nullable=False)  # PRE_RUTA|POST_RUTA
+    ok_general: Mapped[bool | None] = mapped_column(Boolean)
+    items_json: Mapped[dict | None] = mapped_column(JSONB)   # ← antes JSON
+    firmado_por: Mapped[str | None] = mapped_column(Text)
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+class CertificadoCalibracion(Base):
+    __tablename__ = "certificados_calibracion"
+    id_cert: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    equipo: Mapped[str] = mapped_column(Text, nullable=False)
+    numero_cert: Mapped[str | None] = mapped_column(Text)
+    fecha_emision: Mapped[date] = mapped_column(sa.Date, nullable=False)
+    fecha_vencimiento: Mapped[date | None] = mapped_column(sa.Date)
+    laboratorio: Mapped[str | None] = mapped_column(Text)
+    archivo_url: Mapped[str | None] = mapped_column(Text)
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 # ---------------------------------------
 # Utilidad: crear tablas (opcional)

@@ -1,0 +1,147 @@
+{% extends "base_admin.html" %}
+{% block title %}Estados de pedido | Admin{% endblock %}
+
+{% block content %}
+<div class="bg-white border rounded-xl shadow p-5">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-xl font-semibold">Estados de pedido</h1>
+    <div class="space-x-2">
+      <a href="/admin/config/estados-pedido/parametros" class="px-3 py-2 text-sm border rounded hover:bg-gray-50">
+        Parámetros
+      </a>
+      <!-- NUEVO: Botón Flujo -->
+      <button id="btn-flujo" type="button"
+              class="px-3 py-2 text-sm border rounded hover:bg-gray-50">
+        Flujo
+      </button>
+      <a href="/admin/config/estados-pedido/transiciones" class="px-3 py-2 text-sm border rounded hover:bg-gray-50">
+        Transiciones
+      </a>
+      <a href="/admin/config/estados-pedido/nuevo" class="px-3 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700">
+        Nuevo estado
+      </a>
+    </div>
+  </div>
+
+  {% if estado_inicial_codigo %}
+    <div class="mb-4 text-sm text-gray-600">
+      <i class="fa-solid fa-flag-checkered mr-1"></i>
+      Estado inicial: <span class="font-medium">{{ estado_inicial_codigo }}</span>
+    </div>
+  {% endif %}
+
+  <div class="overflow-x-auto">
+    <table class="min-w-full text-sm">
+      <thead>
+        <tr class="text-left text-gray-500 border-b">
+          <th class="py-2 pr-4">Orden</th>
+          <th class="py-2 pr-4">Código</th>
+          <th class="py-2 pr-4">Nombre</th>
+          <th class="py-2 pr-4">Rol responsable</th>
+          <th class="py-2 pr-4">Final</th>
+          <th class="py-2 pr-4">Activo</th>
+          <th class="py-2 pr-4 text-right">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in estados %}
+        <tr class="border-b hover:bg-gray-50">
+          <td class="py-2 pr-4">{{ e.orden }}</td>
+          <td class="py-2 pr-4 font-mono text-xs">{{ e.codigo }}</td>
+          <td class="py-2 pr-4">{{ e.nombre }}</td>
+          <td class="py-2 pr-4">{{ e.rol_responsable }}</td>
+          <td class="py-2 pr-4">
+            {% if e.es_final %}
+              <span class="px-2 py-0.5 text-xs rounded bg-gray-200">Sí</span>
+            {% else %}
+              <span class="px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-500">No</span>
+            {% endif %}
+          </td>
+          <td class="py-2 pr-4">
+            {% if e.activo %}
+              <span class="px-2 py-0.5 text-xs rounded bg-green-100 text-green-700">Activo</span>
+            {% else %}
+              <span class="px-2 py-0.5 text-xs rounded bg-red-100 text-red-700">Inactivo</span>
+            {% endif %}
+          </td>
+          <td class="py-2 pr-4 text-right">
+            <a href="/admin/config/estados-pedido/{{ e.id_estado }}/editar" class="px-2 py-1 text-xs border rounded hover:bg-gray-50">
+              Editar
+            </a>
+            <form action="/admin/config/estados-pedido/{{ e.id_estado }}/toggle" method="post" class="inline">
+              <button class="px-2 py-1 text-xs border rounded hover:bg-gray-50" type="submit">
+                {{ 'Desactivar' if e.activo else 'Activar' }}
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="py-6 text-center text-gray-500">Aún no hay estados configurados.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal Flujo -->
+<div id="modal-flujo" class="fixed inset-0 hidden items-center justify-center z-40">
+  <!-- overlay -->
+  <div class="absolute inset-0 bg-black bg-opacity-40"></div>
+
+  <!-- panel -->
+  <div class="relative bg-white w-11/12 max-w-5xl max-h-[85vh] rounded-xl shadow-lg border z-50 flex flex-col">
+    <div class="px-4 py-3 border-b flex items-center justify-between">
+      <h2 class="text-base font-semibold">Flujo de estados</h2>
+      <button id="btn-cerrar" class="text-gray-500 hover:text-gray-800">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+    <div class="p-4 overflow-auto">
+      <!-- Mermaid render -->
+      <div id="mermaid-graph" class="mermaid">
+        {{ mermaid_graph | safe }}
+      </div>
+    </div>
+    <div class="px-4 py-3 border-t flex justify-end">
+      <button id="btn-cerrar-2" class="px-4 py-2 border rounded hover:bg-gray-50">Cerrar</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  <!-- Mermaid CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    // Inicializa Mermaid sin autoload (lo forzamos al abrir)
+    if (window.mermaid) {
+      window.mermaid.initialize({ startOnLoad: false, theme: "default" });
+    }
+
+    const modal   = document.getElementById("modal-flujo");
+    const openBtn = document.getElementById("btn-flujo");
+    const close1  = document.getElementById("btn-cerrar");
+    const close2  = document.getElementById("btn-cerrar-2");
+
+    function openModal() {
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");  // centrar con flex
+      // Render del gráfico
+      const el = document.getElementById("mermaid-graph");
+      if (window.mermaid && el) {
+        // re-render por si vinimos de un reload parcial
+        mermaid.run({ nodes: [el] }).catch(console.error);
+      }
+    }
+    function closeModal() {
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+    }
+
+    openBtn?.addEventListener("click", openModal);
+    close1?.addEventListener("click", closeModal);
+    close2?.addEventListener("click", closeModal);
+    // cerrar si clic en overlay
+    modal?.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
+  </script>
+{% endblock %}

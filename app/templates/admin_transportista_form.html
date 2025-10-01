@@ -1,0 +1,93 @@
+{% extends "base_admin.html" %}
+{% set edit_mode = item is not none %}
+{% block title %}{{ 'Editar' if edit_mode else 'Nuevo' }} transportista | Admin{% endblock %}
+
+{% block content %}
+<div class="bg-white border rounded-xl shadow p-5 max-w-2xl">
+  <h1 class="text-xl font-semibold mb-4">
+    {{ 'Editar transportista' if edit_mode else 'Nuevo transportista' }}
+  </h1>
+
+  {% if error %}
+    <div class="mb-4 px-3 py-2 rounded bg-red-50 text-red-700 text-sm">{{ error }}</div>
+  {% endif %}
+
+  <form method="post"
+        action="{{ '/admin/transportistas/' ~ item.id_transportista ~ '/actualizar' if edit_mode else '/admin/transportistas/guardar' }}">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="md:col-span-2">
+        <label class="block text-sm text-gray-600 mb-1">Nombre</label>
+        <input name="nombre" required maxlength="120"
+               value="{{ item.nombre if edit_mode else '' }}"
+               class="w-full border rounded px-3 py-2"/>
+      </div>
+
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">RUT</label>
+        <input name="rut" maxlength="20"
+               value="{{ item.rut if edit_mode else '' }}"
+               class="w-full border rounded px-3 py-2" placeholder="12.345.678-9"/>
+      </div>
+
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">Fono</label>
+        <input name="fono" maxlength="40"
+               value="{{ item.fono if edit_mode else '' }}"
+               class="w-full border rounded px-3 py-2"/>
+      </div>
+
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">Email</label>
+        <input name="email" maxlength="120" type="email"
+               value="{{ item.email if edit_mode else '' }}"
+               class="w-full border rounded px-3 py-2"/>
+      </div>
+
+      <div>
+        <label class="block text-sm text-gray-700">Usuario vinculado (opcional)</label>
+        {% set current_usuario = item.usuario if edit_mode else '' %}
+        {% set listado = usuarios_opciones or [] %}
+        {# Mapea la lista a solo usernames para poder usar "in / not in" en Jinja #}
+        {% set listado_usernames = listado | map(attribute='usuario') | list %}
+
+        <select name="usuario" class="border rounded px-3 py-2 w-full">
+          <option value="">— sin usuario —</option>
+
+          {# Si el usuario actual no está en la lista (p.ej. inactivo), igualmente muéstralo #}
+          {% if current_usuario and (current_usuario not in listado_usernames) %}
+            <option value="{{ current_usuario }}" selected>
+              {{ current_usuario }} — (no listado)
+            </option>
+          {% endif %}
+
+          {% for uopt in listado %}
+            <option value="{{ uopt.usuario }}"
+                    {% if current_usuario and current_usuario == uopt.usuario %}selected{% endif %}>
+              {{ uopt.usuario }}{% if uopt.nombre %} — {{ uopt.nombre }}{% endif %}
+            </option>
+          {% endfor %}
+        </select>
+        <p class="text-xs text-gray-500 mt-1">Solo se listan usuarios con rol <strong>Transportista</strong>.</p>
+      </div>
+
+      {% if edit_mode %}
+      <div class="md:col-span-2 mt-2">
+        <input type="hidden" name="activo" value="false">
+        <label class="inline-flex items-center">
+          <input type="checkbox" name="activo" value="true" class="mr-2" {% if item.activo %}checked{% endif %}>
+          Activo
+        </label>
+      </div>
+      {% else %}
+      <!-- por defecto activo al crear -->
+      <input type="hidden" name="activo" value="true">
+      {% endif %}
+    </div>
+
+    <div class="mt-6 flex items-center gap-2">
+      <button class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Guardar</button>
+      <a href="/admin/transportistas" class="px-4 py-2 border rounded hover:bg-gray-50">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

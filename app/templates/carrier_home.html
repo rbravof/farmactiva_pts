@@ -1,0 +1,29 @@
+{% extends "base_carrier.html" %}
+{% block title %}Inicio | Reparto{% endblock %}
+
+{% block content %}
+<h1 class="text-xl font-semibold mb-3">Mis envíos recientes</h1>
+
+<div class="grid grid-cols-1 gap-3">
+  {% for e in envios %}
+    <a href="/carrier/envios/{{ e.id }}" class="block bg-white border rounded-lg p-3 hover:shadow">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-sm text-gray-500">Pedido</div>
+          <div class="font-semibold">{{ e.numero }}</div>
+          <div class="text-sm text-gray-600 mt-1">{{ e.direccion or '—' }}</div>
+        </div>
+        <div>
+          <span class="text-xs px-2 py-1 rounded bg-gray-100">{{ e.estado or '—' }}</span>
+        </div>
+      </div>
+    </a>
+  {% else %}
+    <div class="text-gray-500">No tienes envíos asignados.</div>
+  {% endfor %}
+</div>
+
+<div class="mt-5">
+  <a href="/carrier/envios" class="inline-block text-sm text-blue-600 hover:underline">Ver todos</a>
+</div>
+{% endblock %}

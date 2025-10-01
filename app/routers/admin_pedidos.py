@@ -4,18 +4,18 @@ from app.utils.emailer import send_email
 from fastapi import APIRouter, Depends, Request, Form, Query, HTTPException, BackgroundTasks
 from fastapi.responses import RedirectResponse, JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
-from app.models import Pedido, PedidoItem, PedidoNota, PedidoHistorial  # ORM
+from app.models import Pedido, PedidoItem, PedidoNota, PedidoHistorial, Usuario, UsuarioRol
 from starlette.datastructures import FormData
 from app.database import get_db
 from sqlalchemy.orm import Session
 from datetime import datetime
 import random, re
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
-from sqlalchemy import text
+from sqlalchemy import text, select
 from typing import Optional, Dict
 from sqlalchemy.sql import func
 # Usa el mismo guard que en otros routers admin
-from app.routers.admin_security import require_admin
+from app.routers.admin_security import require_staff
 from app.utils.view import render_admin
 
 # === Pago ===
@@ -28,17 +28,64 @@ except Exception:
 
 templates = Jinja2Templates(directory="app/templates")
 
+BASE_URL_ADMIN = os.getenv("BASE_URL_ADMIN", "http://127.0.0.1:8002").rstrip("/")
+
 # ⚠️ IMPORTANTE: este 'router' es el que espera main.py
 router = APIRouter(
+    prefix="/admin/pedidos",
     tags=["Admin Pedidos"],
-    dependencies=[Depends(require_admin)]
+    dependencies=[Depends(require_staff)]
 )
 
-@router.get("/admin/pedidos")
+
+def _append_pedido_historial(db, id_pedido: int, estado_origen: str, estado_destino: str):
+    """
+    Inserta una fila en historial de estados. Intenta con el modelo ORM
+    (tabla 'pedido_historial') y, si no existe, hace fallback a la tabla
+    'pedido_estado_historial' por SQL crudo.
+    """
+    print(f"[HIST] id_pedido={id_pedido} origen={estado_origen} -> destino={estado_destino}")
+
+    # 1) Intento con el modelo ORM (tabla: pedido_historial)
+    try:
+        rec = PedidoHistorial(
+            id_pedido=id_pedido,
+            estado_origen=estado_origen,
+            estado_destino=estado_destino,
+        )
+        db.add(rec)
+        db.flush()  # para forzar la inserción ahora
+        print("[HIST] Insert ORM OK (pedido_historial)")
+        return
+    except Exception as ex:
+        # Puede fallar si la tabla mapeada no existe en la BD (nombres distintos)
+        print(f"[HIST] ORM insert falló: {ex}. Reintentando por SQL crudo…")
+
+    # 2) Fallback: tabla alternativa 'pedido_estado_historial'
+    try:
+        db.execute(
+            text("""
+                INSERT INTO public.pedido_estado_historial
+                    (id_pedido, estado_origen, estado_destino)
+                VALUES (:id_pedido, :estado_origen, :estado_destino)
+            """),
+            {
+                "id_pedido": id_pedido,
+                "estado_origen": estado_origen,
+                "estado_destino": estado_destino,
+            },
+        )
+        print("[HIST] Insert SQL OK (pedido_estado_historial)")
+    except Exception as ex2:
+        print(f"[HIST] Fallback SQL también falló: {ex2}")
+        # lo dejamos propagar para que veas el error y alinear nombres de tabla
+        raise
+
+@router.get("/")
 def admin_pedidos_list(
     request: Request,
     db: Session = Depends(get_db),
-    admin_user: dict = Depends(require_admin),
+    admin_user: dict = Depends(require_staff),
 ):
     # ¿Existe la tabla pedido_notas? (devuelve True/False)
     has_notas = bool(db.execute(text("""
@@ -121,18 +168,18 @@ def admin_pedidos_list(
     ctx = {"rows": rows, "estados": [], "flash_success": flash_success}
     return render_admin(templates, request, "admin_pedidos_list.html", ctx, admin_user)
 
-@router.get("/admin/pedidos/nuevo")
-def admin_pedidos_new(request: Request, admin_user: dict = Depends(require_admin)):
+@router.get("/nuevo")
+def admin_pedidos_new(request: Request, admin_user: dict = Depends(require_staff)):
     return render_admin(templates, request, "admin_pedidos_form.html", {}, admin_user)
 
-@router.post("/admin/pedidos/nuevo")
+@router.post("/nuevo")
 async def admin_pedidos_new_submit(
     request: Request,
     id_cliente: str = Form(None),
     canal: str = Form("manual"),
     accion: str = Form("solo_crear"),
     db: Session = Depends(get_db),
-    admin_user: dict = Depends(require_admin),
+    admin_user: dict = Depends(require_staff),
     background_tasks: BackgroundTasks = None,
 ):
     OFFSET_BASE = 1000
@@ -171,33 +218,80 @@ async def admin_pedidos_new_submit(
                 # soporta names del form como envio[nombre] o nombre
                 return (form.get(f"envio[{k}]") or form.get(k) or "").strip()
 
+            # IDs opcionales (si el formulario los envía)
+            id_comuna_form  = _int_or_none(_get_env("id_comuna"))
+            id_region_form  = _int_or_none(_get_env("id_region"))
+
             envio = {
                 "id_cliente":  id_cli,
                 "nombre":      _get_env("nombre") or None,
-                "telefono":    _get_env("telefono") or None,
+                "telefono":    (_get_env("telefono") or None),
                 "calle":       _get_env("calle") or None,
                 "numero":      _get_env("numero") or None,
                 "depto":       _get_env("depto") or None,
-                "comuna":      _get_env("comuna") or None,
+                "comuna":      _get_env("comuna") or None,   # texto (compat)
                 "ciudad":      _get_env("ciudad") or None,
-                "region":      _get_env("region") or None,
+                "region":      _get_env("region") or None,   # texto (compat)
                 "referencia":  _get_env("referencia") or None,
+                "id_comuna":   id_comuna_form,
+                "id_region":   id_region_form,
             }
+
+            # Resolver IDs por nombre si no vinieron y tenemos texto
+            # (ajusta nombres de tablas/campos si tu catálogo es distinto)
+            try:
+                if envio["id_comuna"] is None and envio["comuna"]:
+                    row = db.execute(text("""
+                        SELECT id_comuna FROM public.comunas 
+                        WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(:n))
+                        LIMIT 1
+                    """), {"n": envio["comuna"]}).first()
+                    if row:
+                        envio["id_comuna"] = row[0]
+                        print(f"[PEDIDOS/NUEVO][{trc}] id_comuna resuelto por nombre='{envio['comuna']}' -> {envio['id_comuna']}")
+                if envio["id_region"] is None and envio["region"]:
+                    row = db.execute(text("""
+                        SELECT id_region FROM public.regiones 
+                        WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(:n))
+                        LIMIT 1
+                    """), {"n": envio["region"]}).first()
+                    if row:
+                        envio["id_region"] = row[0]
+                        print(f"[PEDIDOS/NUEVO][{trc}] id_region resuelto por nombre='{envio['region']}' -> {envio['id_region']}")
+            except Exception as e:
+                print(f"[PEDIDOS/NUEVO][{trc}] WARN resolviendo IDs comuna/region: {e}")
 
             # criterio mínimo para considerar que hay datos reales de dirección
             tiene_datos = any([envio["calle"], envio["comuna"], envio["ciudad"], envio["nombre"]])
             print(f"[PEDIDOS/NUEVO][{trc}] Datos dirección detectados: {envio} -> tiene_datos={tiene_datos}")
 
             if tiene_datos:
-                res = db.execute(text("""
-                    INSERT INTO public.direcciones_envio
-                      (id_cliente, nombre, telefono, calle, numero, depto, comuna, ciudad, region, referencia)
-                    VALUES
-                      (:id_cliente, :nombre, :telefono, :calle, :numero, :depto, :comuna, :ciudad, :region, :referencia)
-                    RETURNING id_direccion
-                """), envio)
-                id_direccion = res.scalar()
-                print(f"[PEDIDOS/NUEVO][{trc}] Dirección creada id={id_direccion}")
+                # Inserta incluyendo id_comuna/id_region (si tu tabla ya los tiene)
+                try:
+                    res = db.execute(text("""
+                        INSERT INTO public.direcciones_envio
+                          (id_cliente, nombre, telefono, calle, numero, depto, comuna, ciudad, region, referencia, id_comuna, id_region)
+                        VALUES
+                          (:id_cliente, :nombre, :telefono, :calle, :numero, :depto, :comuna, :ciudad, :region, :referencia, :id_comuna, :id_region)
+                        RETURNING id_direccion
+                    """), envio)
+                    id_direccion = res.scalar()
+                    print(f"[PEDIDOS/NUEVO][{trc}] Dirección creada id={id_direccion} (con IDs)")
+                except Exception as e:
+                    # Fallback: si aún no agregaste las columnas id_comuna/id_region, probamos sin ellas
+                    db.rollback()
+                    print(f"[PEDIDOS/NUEVO][{trc}] WARN insert con IDs falló ({e}); reintento sin id_comuna/id_region")
+                    res = db.execute(text("""
+                        INSERT INTO public.direcciones_envio
+                          (id_cliente, nombre, telefono, calle, numero, depto, comuna, ciudad, region, referencia)
+                        VALUES
+                          (:id_cliente, :nombre, :telefono, :calle, :numero, :depto, :comuna, :ciudad, :region, :referencia)
+                        RETURNING id_direccion
+                    """), envio)
+                    id_direccion = res.scalar()
+                    print(f"[PEDIDOS/NUEVO][{trc}] Dirección creada id={id_direccion} (sin IDs)")
+            else:
+                print(f"[PEDIDOS/NUEVO][{trc}] No se detectaron datos suficientes de dirección; no se inserta en direcciones_envio.")
 
         # ---- Ítems (paso 1) ----
         ids_prod   = form.getlist("items[][id_producto]") or form.getlist("items[id_producto]")
@@ -287,7 +381,7 @@ async def admin_pedidos_new_submit(
             canal=(canal or "manual"),
             estado_codigo=estado_inicial,
             id_tipo_envio=id_tipo_envio,
-            id_direccion_envio=id_direccion,  # <- ahora puede venir del insert en direcciones_envio
+            id_direccion_envio=id_direccion,  # <- viene del insert en direcciones_envio (si se creó)
             costo_envio=int(costo_envio or 0),
             total_neto=int(total_neto),
         )
@@ -353,6 +447,13 @@ async def admin_pedidos_new_submit(
         # ---- Commit ----
         db.commit()
         print(f"[PEDIDOS/NUEVO][{trc}] ✅ Commit OK. Pedido id={pedido.id_pedido} numero={pedido.numero}")
+
+        # ---- Notificación a QF si el pedido nació en NUEVO ----
+        try:
+            if (estado_inicial or "").upper() == "NUEVO":
+                _notify_qf_new_order(db, pedido.id_pedido, pedido.numero)
+        except Exception as e:
+            print(f"[MAIL][QF][{trc}] Error notificando a QF: {e}")
 
         # ===================== ACCIÓN: CREAR Y ENVIAR LINK =====================
         if (accion or "").lower() == "crear_enviar_link":
@@ -471,16 +572,18 @@ async def admin_pedidos_new_submit(
 # =========================================================
 # JSON usados por el frontend
 # =========================================================
-
-@router.get("/admin/pedidos/flujo")
-def admin_pedidos_flujo(admin_user: dict = Depends(require_admin)):
-    # Mermaid de ejemplo; luego se generará desde BD
+@router.get("/flujo")
+def admin_pedidos_flujo(admin_user: dict = Depends(require_staff)):
+    # Mermaid de ejemplo; pronto se generará desde BD.
+    # RECHAZADO_QF ahora es final (sin flechas de salida) y con estilo "terminal".
     mermaid = """
     flowchart LR
+      classDef terminal fill:#fee2e2,stroke:#ef4444,color:#7f1d1d,stroke-width:2;
+
       NUEVO["Nuevo (QF)"]
       APROBADO_QF["Aprobado QF (Preparación)"]
       APROBADO_CRITERIO_QF["Aprobado Criterio QF (Preparación)"]
-      RECHAZADO_QF["Rechazado QF (Preparación)"]
+      RECHAZADO_QF["Rechazado QF (Final)"]:::terminal
       EN_PREPARACION["En Preparación (Logística)"]
       EN_TRANSITO["En Tránsito (Logística)"]
       ENTREGADO["Entregado (Atención)"]
@@ -492,7 +595,6 @@ def admin_pedidos_flujo(admin_user: dict = Depends(require_admin)):
 
       APROBADO_QF --> EN_PREPARACION
       APROBADO_CRITERIO_QF --> EN_PREPARACION
-      RECHAZADO_QF --> EN_PREPARACION
 
       EN_PREPARACION --> EN_TRANSITO
       EN_TRANSITO --> ENTREGADO
@@ -500,18 +602,26 @@ def admin_pedidos_flujo(admin_user: dict = Depends(require_admin)):
     """.strip()
     return JSONResponse({"ok": True, "mermaid": mermaid})
 
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
-@router.get("/admin/pedidos/{id_pedido}/siguientes-estados")
-def admin_pedidos_siguientes_estados(id_pedido: int, admin_user: dict = Depends(require_admin)):
-    # Stub: devolvemos opciones genéricas para que el modal funcione
-    opciones = [
-        {"codigo": "APROBADO_QF", "nombre": "Aprobado QF", "rol_destino": "PREPARACION"},
-        {"codigo": "APROBADO_CRITERIO_QF", "nombre": "Aprobado Bajo Criterio QF", "rol_destino": "PREPARACION"},
-        {"codigo": "RECHAZADO_QF", "nombre": "Rechazado QF", "rol_destino": "PREPARACION"},
-    ]
-    return JSONResponse({"ok": True, "opciones": opciones})
+@router.get("/{id_pedido}/siguientes-estados")
+def admin_pedidos_siguientes_estados(
+    id_pedido: int,
+    db: Session = Depends(get_db),
+    admin_user: dict = Depends(require_staff),
+):
+    cur = db.execute(
+        text("SELECT estado_codigo FROM public.pedidos WHERE id_pedido = :id"),
+        {"id": id_pedido}
+    ).scalar()
+    if not cur:
+        return JSONResponse({"ok": False, "error": "Pedido no encontrado"}, status_code=404)
 
-@router.post("/admin/pedidos/{id_pedido}/cambiar-estado")
+    items = _next_states_for(db, cur)
+    return JSONResponse({"ok": True, "items": items})
+
+@router.post("/{id_pedido}/cambiar-estado")
 def admin_pedidos_cambiar_estado(
     id_pedido: int,
     nuevo_estado: str = Form(...),
@@ -519,311 +629,265 @@ def admin_pedidos_cambiar_estado(
     nota_rol: str | None = Form(None),
     destinatario_rol: str | None = Form(None),
     db: Session = Depends(get_db),
-    admin_user: dict = Depends(require_admin),
+    admin_user: dict = Depends(require_staff),
 ):
     print(f"[pedidos/actions] cambiar estado id={id_pedido} -> {nuevo_estado}")
 
-    # Sanitiza
-    def _clean(s):
-        return s.strip() if isinstance(s, str) and s.strip() else None
+    def _clean(s): return s.strip() if isinstance(s, str) and s.strip() else None
     nota_cliente = _clean(nota_cliente)
     nota_rol = _clean(nota_rol)
     destinatario_rol = _clean(destinatario_rol)
 
     if not nuevo_estado or len(nuevo_estado) > 64:
-        return JSONResponse({"ok": False, "error": "estado inválido"})
+        return JSONResponse({"ok": False, "error": "estado inválido"}, status_code=400)
 
-    # Estado actual
-    cur = db.execute(text("SELECT estado_codigo FROM public.pedidos WHERE id_pedido = :id"),
-                     {"id": id_pedido}).scalar()
+    # Código del estado actual
+    estado_actual = db.execute(
+        text("SELECT estado_codigo FROM public.pedidos WHERE id_pedido = :id"),
+        {"id": id_pedido},
+    ).scalar()
+    print(f"[pedidos/actions] estado_actual={estado_actual!r}")
 
-    # Validación de transición (si hay reglas)
-    allowed = _next_states_for(db, cur)
+    # Validación transición (si aplica)
+    allowed = _next_states_for(db, estado_actual)
     allowed_codes = {e["codigo"] for e in allowed}
     if allowed_codes and nuevo_estado not in allowed_codes:
-        return JSONResponse({"ok": False, "error": "Transición no permitida"})
+        return JSONResponse({"ok": False, "error": "Transición no permitida"}, status_code=400)
 
-    # Validación opcional de catálogo
-    try:
-        exists = db.execute(
-            text("SELECT 1 FROM public.pedido_estados WHERE codigo = :c LIMIT 1"),
-            {"c": nuevo_estado}
+    # IDs de catálogo (ORIGEN y DESTINO)
+    id_estado_destino = db.execute(
+        text("SELECT id_estado FROM public.pedido_estados WHERE codigo = :c"),
+        {"c": nuevo_estado},
+    ).scalar()
+    if not id_estado_destino:
+        return JSONResponse({"ok": False, "error": "Estado destino no existe en catálogo"}, status_code=400)
+
+    id_estado_origen = None
+    if estado_actual:
+        id_estado_origen = db.execute(
+            text("SELECT id_estado FROM public.pedido_estados WHERE codigo = :c"),
+            {"c": estado_actual},
         ).scalar()
-        if not exists:
-            print("[pedidos/actions] WARNING: estado no está en catálogo; se continúa igual")
-    except Exception:
-        pass
 
-    # Actualizar estado
-    db.execute(text("""
-        UPDATE public.pedidos
-           SET estado_codigo = :estado
-         WHERE id_pedido = :id
-    """), {"estado": nuevo_estado, "id": id_pedido})
+    # id del actor para created_by
+    actor_usuario = (admin_user or {}).get("usuario")
+    created_by_id = db.execute(
+        text("SELECT id FROM public.usuarios WHERE usuario = :u"),
+        {"u": actor_usuario},
+    ).scalar()
 
-    # Registrar notas (si la tabla existe)
-    autor = (admin_user or {}).get("nombre") or "admin"
+    # Nota obligatoria para historial
+    nota_hist = nota_rol or nota_cliente or f"Cambio de estado de {estado_actual or '—'} a {nuevo_estado}"
+
     try:
-        # Nota automática del cambio
-        db.execute(text("""
-            INSERT INTO public.pedido_notas (id_pedido, texto, audiencia, creado_en, autor_nombre, autor_rol)
-            VALUES (:id, :texto, 'interno', now(), :autor, 'admin')
-        """), {"id": id_pedido, "texto": f"Estado cambiado de {cur or '—'} a {nuevo_estado}", "autor": autor})
-
-        # Nota para el cliente (visible al cliente)
-        if nota_cliente:
-            db.execute(text("""
-                INSERT INTO public.pedido_notas (id_pedido, texto, audiencia, creado_en, autor_nombre, autor_rol)
-                VALUES (:id, :texto, 'cliente', now(), :autor, 'admin')
-            """), {"id": id_pedido, "texto": nota_cliente, "autor": autor})
-
-        # Nota interna para el próximo rol
-        if nota_rol or destinatario_rol:
-            db.execute(text("""
-                INSERT INTO public.pedido_notas (id_pedido, texto, audiencia, destinatario_rol, creado_en, autor_nombre, autor_rol)
-                VALUES (:id, :texto, 'interno', :destinatario, now(), :autor, 'admin')
-            """), {
-                "id": id_pedido,
-                "texto": nota_rol or ("Instrucciones para " + destinatario_rol if destinatario_rol else "Instrucciones"),
-                "destinatario": destinatario_rol,
-                "autor": autor,
-            })
-    except Exception as e:
-        print(f"[pedidos/actions] notas opcionales omitidas: {e}")
-
-    db.commit()
-    print("[pedidos/actions] cambio de estado OK con notas adicionales")
-    return JSONResponse({"ok": True, "nuevo_estado": nuevo_estado})
-
-# ============================
-# Productos: búsqueda y precio
-# ============================
-
-@router.get("/admin/productos/buscar")
-def admin_productos_buscar(
-    q: str,
-    id_lista: int | None = None,
-    limit: int = 20,
-    db: Session = Depends(get_db),
-    admin_user: dict = Depends(require_admin),
-):
-    q = (q or "").strip()
-    if len(q) < 2:
-        return []
-
-    params = {
-        "q_name": f"%{q.lower()}%",
-        "q_ean":  f"%{q}%",
-        "limit":  max(1, min(limit, 50)),
-    }
-    id_lista_filter = ""
-    if id_lista is not None:
-        id_lista_filter = "AND pr.id_lista = :id_lista"
-        params["id_lista"] = id_lista
-
-    sql = f"""
-        SELECT
-          p.id_producto                   AS id,
-          p.titulo                        AS nombre,
-          p.slug                          AS slug,
-          p.imagen_principal_url          AS imagen,
-          (
-            SELECT cb.codigo_barra
-            FROM public.codigos_barras cb
-            WHERE cb.id_producto = p.id_producto AND cb.es_principal = TRUE
-            LIMIT 1
-          ) AS ean,
-          prx.precio_sugerido
-        FROM public.productos p
-        LEFT JOIN LATERAL (
-          SELECT CAST(ROUND(pr.precio_bruto) AS INTEGER) AS precio_sugerido
-          FROM public.precios pr
-          WHERE pr.id_producto = p.id_producto
-            {id_lista_filter}
-            AND (pr.vigente_hasta IS NULL OR pr.vigente_hasta >= now())
-          ORDER BY pr.vigente_desde DESC, pr.id_precio DESC
-          LIMIT 1
-        ) prx ON TRUE
-        WHERE
-              LOWER(p.titulo) LIKE :q_name
-          OR  LOWER(p.slug)   LIKE :q_name
-          OR  EXISTS (
-                SELECT 1
-                FROM public.codigos_barras cb2
-                WHERE cb2.id_producto = p.id_producto
-                  AND cb2.codigo_barra ILIKE :q_ean
-              )
-        ORDER BY LOWER(p.titulo) ASC
-        LIMIT :limit
-    """
-
-    rows = db.execute(text(sql), params).mappings().all()
-    items = [{
-        "id": r["id"],
-        "nombre": r["nombre"],
-        "slug": r["slug"],
-        "imagen": r["imagen"],
-        "ean": r["ean"],
-        "precio_sugerido": int(r["precio_sugerido"]) if r["precio_sugerido"] is not None else 0,
-    } for r in rows]
-
-    print(f"[BUSCAR productos] q='{q}' -> {len(items)} coincidencias")
-    return items
-
-
-@router.get("/admin/productos/precio")
-def admin_productos_precio(
-    id_producto: int,
-    id_lista: int | None = None,
-    db: Session = Depends(get_db),
-    admin_user: dict = Depends(require_admin),
-):
-    try:
-        params = {"id": id_producto}
-        id_lista_filter = ""
-        if id_lista is not None:
-            id_lista_filter = "AND pr.id_lista = :id_lista"
-            params["id_lista"] = id_lista
-
-        sql = f"""
-            SELECT CAST(ROUND(pr.precio_bruto) AS INTEGER) AS precio
-            FROM public.precios pr
-            WHERE pr.id_producto = :id
-              {id_lista_filter}
-              AND (pr.vigente_hasta IS NULL OR pr.vigente_hasta >= now())
-            ORDER BY pr.vigente_desde DESC, pr.id_precio DESC
-            LIMIT 1
-        """
-
-        precio = db.execute(text(sql), params).scalar()
-        return JSONResponse({"ok": True, "precio": int(precio or 0)})
-    except Exception as e:
-        print("[/admin/productos/precio] error:", e)
-        return JSONResponse({"ok": False, "precio": 0})
-
-
-# =======================================
-# Envíos: tipos y cálculo dinámico tarifa
-# =======================================
-
-# 3.1) Listado de tipos de envío activos (para poblar el <select>)
-@router.get("/admin/api/envios/tipos")
-def api_envios_tipos(db: Session = Depends(get_db)):
-    rows = db.execute(text("""
-        SELECT id_tipo_envio AS id, codigo, nombre, requiere_direccion
-        FROM public.tipos_envio
-        WHERE activo = TRUE
-        ORDER BY orden ASC, nombre ASC
-    """)).mappings().all()
-    # devolvemos lista simple para que el HTML pueda iterarla
-    return {"ok": True, "items": rows}
-
-
-# 3.2) Cálculo de costo de envío con reglas por comuna / región / default
-@router.get("/admin/api/envios/tarifa")
-def api_envios_tarifa(
-    id_tipo_envio: int = Query(...),
-    id_comuna: int | None = Query(None),
-    id_region: int | None = Query(None),
-    subtotal_items: int = Query(0),             # total de ítems (CLP, sin IVA si así decides)
-    peso_total_g: int | None = Query(None),     # opcional si manejas pesos
-    db: Session = Depends(get_db),
-):
-    """
-    Selecciona la mejor regla:
-      1) match por comuna (activo)
-      2) match por región (activo)
-      3) regla 'por defecto' (sin comuna/ región)
-    respetando prioridad (menor = más específica).
-    Aplica gratis_desde si corresponde.
-    """
-    params = {
-        "id_tipo": id_tipo_envio,
-        "id_comuna": id_comuna,
-        "id_region": id_region,
-        "peso": peso_total_g,
-    }
-
-    sql = """
-    WITH cand AS (
-      SELECT
-        t.id_tarifa, t.base_clp, t.gratis_desde, t.prioridad,
-        CASE WHEN t.id_comuna IS NOT NULL THEN 1
-             WHEN t.id_region IS NOT NULL THEN 2
-             ELSE 3 END AS nivel
-      FROM public.envio_tarifas t
-      WHERE t.id_tipo_envio = :id_tipo
-        AND t.activo = TRUE
-        AND COALESCE(:peso, 0) >= COALESCE(t.peso_min_g, 0)
-        AND (t.peso_max_g IS NULL OR COALESCE(:peso, 0) <= t.peso_max_g)
-        AND (
-              (:id_comuna IS NOT NULL AND t.id_comuna = :id_comuna)
-           OR (:id_comuna IS NULL  AND :id_region IS NOT NULL AND t.id_region = :id_region)
-           OR (t.id_comuna IS NULL AND t.id_region IS NULL)
+        # 1) Actualizar estado del pedido
+        db.execute(
+            text("""
+                UPDATE public.pedidos
+                   SET estado_codigo = :estado
+                 WHERE id_pedido = :id
+            """),
+            {"estado": nuevo_estado, "id": id_pedido},
         )
-    )
-    SELECT base_clp, gratis_desde
-    FROM cand
-    ORDER BY nivel ASC, prioridad ASC
-    LIMIT 1;
-    """
-    row = db.execute(text(sql), params).mappings().first()
-    if not row:
-        return {"ok": True, "costo": 0, "motivo": "sin_regla"}
 
-    costo = int(row["base_clp"] or 0)
-    if row["gratis_desde"] is not None and subtotal_items >= int(row["gratis_desde"]):
-        costo = 0
-    return {"ok": True, "costo": costo}
+        # 2) Insertar historial con ORIGEN + DESTINO
+        db.execute(
+            text("""
+                INSERT INTO public.pedido_estado_historial
+                    (id_pedido, estado_origen, estado_destino, nota, audiencia, destinatario_rol, created_by, creado_en)
+                VALUES
+                    (:id_pedido, :id_origen, :id_destino, :nota,
+                     COALESCE(:audiencia, 'NEXT_ROLE'::audiencia_nota),
+                     :destinatario, :created_by, now())
+            """),
+            {
+                "id_pedido": id_pedido,
+                "id_origen": id_estado_origen,
+                "id_destino": id_estado_destino,
+                "nota": nota_hist,
+                "audiencia": None,
+                "destinatario": destinatario_rol,
+                "created_by": created_by_id,
+            },
+        )
 
+        # 3) Notas opcionales (como antes)
+        try:
+            autor_nombre = (admin_user or {}).get("nombre") or actor_usuario or "admin"
+            db.execute(
+                text("""
+                    INSERT INTO public.pedido_notas
+                        (id_pedido, texto, audiencia, creado_en, autor_nombre, autor_rol)
+                    VALUES
+                        (:id, :texto, 'interno', now(), :autor, 'admin')
+                """),
+                {"id": id_pedido, "texto": f"Estado cambiado de {estado_actual or '—'} a {nuevo_estado}", "autor": autor_nombre},
+            )
+            if nota_cliente:
+                db.execute(
+                    text("""
+                        INSERT INTO public.pedido_notas
+                            (id_pedido, texto, audiencia, creado_en, autor_nombre, autor_rol)
+                        VALUES
+                            (:id, :texto, 'cliente', now(), :autor, 'admin')
+                    """),
+                    {"id": id_pedido, "texto": nota_cliente, "autor": autor_nombre},
+                )
+            if nota_rol or destinatario_rol:
+                db.execute(
+                    text("""
+                        INSERT INTO public.pedido_notas
+                            (id_pedido, texto, audiencia, destinatario_rol, creado_en, autor_nombre, autor_rol)
+                        VALUES
+                            (:id, :texto, 'interno', :destino, now(), :autor, 'admin')
+                    """),
+                    {
+                        "id": id_pedido,
+                        "texto": nota_rol or (f"Instrucciones para {destinatario_rol}" if destinatario_rol else "Instrucciones"),
+                        "destino": destinatario_rol,
+                        "autor": autor_nombre,
+                    },
+                )
+        except Exception as e_notes:
+            print(f"[pedidos/actions] notas opcionales omitidas: {e_notes}")
 
-# Variante interna usada por el paso 2 (compatibilidad con tu HTML actual)
-@router.get("/admin/envios/tarifa")
-def admin_envios_tarifa(
-    id_tipo_envio: int = Query(..., alias="id_tipo_envio"),
-    id_region: Optional[int] = Query(None),
-    id_comuna: Optional[int] = Query(None),
-    subtotal: int = Query(0),  # subtotal neto de ítems (sin IVA)
+        # 4) Acción especial si el destino es RECHAZADO_QF: archivar + notificar cliente
+        if (nuevo_estado or "").upper() == "RECHAZADO_QF":
+            print(f"🧩 [pedidos/actions] Post-acción por destino=RECHAZADO_QF id={id_pedido}")
+
+            # 4.1) Intentar marcar como 'histórico' si existen columnas archivado/archivado_en
+            try:
+                res_arch = db.execute(text("""
+                    UPDATE public.pedidos
+                       SET archivado = TRUE,
+                           archivado_en = now()
+                     WHERE id_pedido = :id
+                """), {"id": id_pedido})
+                print(f"🗄️ [pedidos/actions] archivado={res_arch.rowcount} filas afectadas (si 0, puede que no existan columnas)")
+            except Exception as e_arch:
+                print(f"⚠️ [pedidos/actions] No se pudo marcar histórico (puede no existir columna): {e_arch}")
+
+            # 4.2) Notificar al cliente por email (si hay email)
+            try:
+                cli = db.execute(text("""
+                    SELECT p.numero, c.email, c.nombre
+                      FROM public.pedidos p
+                      JOIN public.clientes c ON c.id_cliente = p.id_cliente
+                     WHERE p.id_pedido = :id
+                     LIMIT 1
+                """), {"id": id_pedido}).mappings().first() or {}
+
+                numero_fmt = (cli.get("numero") or f"#{id_pedido}")
+                email_to   = (cli.get("email") or "").strip()
+                cli_nombre = (cli.get("nombre") or "").strip()
+
+                if email_to:
+                    try:
+                        from app.utils.emailer import send_email
+                        asunto = f"Pedido {numero_fmt} rechazado por QF"
+                        html = f"""
+                            <h2>Pedido rechazado</h2>
+                            <p>Hola {cli_nombre or 'cliente'},</p>
+                            <p>Tu pedido <strong>{numero_fmt}</strong> fue <strong>rechazado por nuestro Químico Farmacéutico</strong> tras la revisión correspondiente.</p>
+                            <p>Si tienes dudas, responde este correo para ayudarte.</p>
+                        """.strip()
+                        text_alt = f"Pedido {numero_fmt} rechazado por QF."
+                        ok = send_email(email_to, asunto, html, text_alt)
+                        print(f"📧 [pedidos/actions] Correo rechazo-> {ok} to={email_to}")
+                    except Exception as e_mail:
+                        print(f"💥 [pedidos/actions] Error enviando correo de rechazo: {e_mail}")
+                else:
+                    print("ℹ️ [pedidos/actions] Cliente sin email; no se envía notificación.")
+            except Exception as e_cli:
+                print(f"⚠️ [pedidos/actions] No se pudo obtener datos de cliente para aviso: {e_cli}")
+
+            # 4.3) Registrar nota para cliente (explicando rechazo)
+            try:
+                autor_nombre = (admin_user or {}).get("nombre") or actor_usuario or "admin"
+                texto_cli = "Tu pedido fue rechazado por QF tras la revisión correspondiente. Si tienes dudas, contáctanos."
+                db.execute(text("""
+                    INSERT INTO public.pedido_notas
+                        (id_pedido, texto, audiencia, creado_en, autor_nombre, autor_rol)
+                    VALUES
+                        (:id, :texto, 'cliente', now(), :autor, 'admin')
+                """), {"id": id_pedido, "texto": texto_cli, "autor": autor_nombre})
+                print("📝 [pedidos/actions] Nota para cliente registrada por rechazo QF")
+            except Exception as e_nc:
+                print(f"⚠️ [pedidos/actions] No se pudo insertar nota de cliente: {e_nc}")
+
+        # Commit final
+        db.commit()
+        print("[pedidos/actions] cambio de estado OK + historial + notas (+ post-acción si aplica)")
+        return JSONResponse({"ok": True, "nuevo_estado": nuevo_estado})
+    except Exception as e:
+        db.rollback()
+        print(f"[pedidos/actions] ERROR cambiando estado: {e}")
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+# =========================================================
+# Asignar Transportista
+# =========================================================
+@router.post("/{id_pedido}/asignar-transportista")
+def admin_pedido_asignar_transportista(
+    id_pedido: int,
+    id_transportista: int = Form(...),
+    tracking_ext: str = Form(""),
+    obs: str = Form(""),
     db: Session = Depends(get_db),
-    admin_user: dict = Depends(require_admin),
+    admin_user: dict = Depends(require_staff),
 ):
-    rows = db.execute(text("""
-        SELECT
-            t.id_tarifa, t.base_clp, t.gratis_desde, t.prioridad,
-            t.id_region, t.id_comuna
-        FROM public.envio_tarifas t
-        WHERE t.activo = TRUE
-          AND t.id_tipo_envio = :tipo
-          AND (:id_comuna IS NULL OR t.id_comuna IS NULL OR t.id_comuna = :id_comuna)
-          AND (:id_region IS NULL OR t.id_region IS NULL OR t.id_region = :id_region)
-        ORDER BY
-          CASE WHEN t.id_comuna IS NOT NULL THEN 0
-               WHEN t.id_region IS NOT NULL THEN 1
-               ELSE 2 END,
-          t.prioridad ASC, t.base_clp ASC
-        LIMIT 1
-    """), {
-        "tipo": id_tipo_envio,
-        "id_region": id_region,
-        "id_comuna": id_comuna,
-    }).mappings().all()
+    actor_usuario = (admin_user or {}).get("usuario")
+    print(f"[CARRIER][ASSIGN] id_pedido={id_pedido} -> id_transportista={id_transportista} by={actor_usuario}")
 
-    if not rows:
-        return {"ok": True, "costo": 0, "aplicado_gratis": False}
+    # Validaciones básicas
+    ped = db.execute(text("SELECT id_pedido FROM public.pedidos WHERE id_pedido=:id"), {"id": id_pedido}).first()
+    if not ped:
+        return JSONResponse({"ok": False, "error": "Pedido no existe"}, status_code=404)
+    tr = db.execute(text("""
+        SELECT id_transportista, nombre, activo FROM public.transportistas WHERE id_transportista=:t
+    """), {"t": id_transportista}).mappings().first()
+    if not tr or not tr.get("activo", False):
+        return JSONResponse({"ok": False, "error": "Transportista inválido o inactivo"}, status_code=400)
 
-    t = rows[0]
-    costo = int(t["base_clp"] or 0)
-    aplicado_gratis = False
-    if t["gratis_desde"] is not None and subtotal >= int(t["gratis_desde"]):
-        costo = 0
-        aplicado_gratis = True
+    try:
+        # 1) cerrar asignación vigente si existe
+        db.execute(text("""
+            UPDATE public.pedido_asignaciones
+               SET activo = FALSE, estado_logistico = 'ASIGNADO', actualizado_en = now()
+             WHERE id_pedido = :p AND activo = TRUE
+        """), {"p": id_pedido})
 
-    return {
-        "ok": True,
-        "costo": costo,
-        "aplicado_gratis": aplicado_gratis,
-        "id_tarifa": t["id_tarifa"],
-    }
+        # 2) crear nueva asignación activa
+        row = db.execute(text("""
+            INSERT INTO public.pedido_asignaciones (id_pedido, id_transportista, estado_logistico, asignado_por, tracking_ext, obs, activo)
+            VALUES (:p, :t, 'ASIGNADO', :who, NULLIF(:trk,''), NULLIF(:obs,''), TRUE)
+            RETURNING id_asignacion
+        """), {"p": id_pedido, "t": id_transportista, "who": actor_usuario, "trk": tracking_ext, "obs": obs}).first()
+        id_asig = row[0]
+
+        # 3) evento logístico
+        db.execute(text("""
+            INSERT INTO public.pedido_envio_eventos (id_pedido, id_asignacion, estado, nota, actor, actor_usuario)
+            VALUES (:p, :a, 'ASIGNADO', :n, 'admin', :who)
+        """), {"p": id_pedido, "a": id_asig, "n": f"Asignado a {tr['nombre']}", "who": actor_usuario})
+
+        # 4) nota interna para el timeline
+        try:
+            db.execute(text("""
+                INSERT INTO public.pedido_notas (id_pedido, autor_nombre, autor_rol, audiencia, texto, creado_en)
+                VALUES (:p, :autor, 'admin', 'interno', :txt, now())
+            """), {"p": id_pedido, "autor": (admin_user or {}).get("nombre") or actor_usuario or "admin",
+                   "txt": f"Pedido asignado a {tr['nombre']} ({tr['id_transportista']})."})
+        except Exception as e_notes:
+            print(f"[CARRIER][ASSIGN] warn notas: {e_notes}")
+
+        db.commit()
+        print(f"[CARRIER][ASSIGN] ✅ OK id_pedido={id_pedido} id_asignacion={id_asig}")
+        return RedirectResponse(url=f"/admin/pedidos/{id_pedido}?ok=asignado", status_code=303)
+    except Exception as e:
+        db.rollback()
+        print(f"[CARRIER][ASSIGN] 💥 ERROR: {e}")
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 # =========================================================
 # Integración Mercado Pago – preferencia, callback, webhook
@@ -843,65 +907,13 @@ def _get_mp_client():
     except Exception as e:
         return None, f"No fue posible inicializar SDK MP: {e}"
 
-@router.post("/admin/api/pagos/mp/preferencias")
-def api_mp_crear_preferencia(
-    # datos mínimos; el front calcula totales
-    titulo: str = Form("Pedido Farmactiva"),
-    descripcion: str = Form(""),
-    total_clp: int = Form(...),                   # total final en CLP (con IVA y envío)
-    email_cliente: str = Form(""),
-    external_reference: str = Form(""),
-    # URLs de retorno (opcional; por defecto volvemos al admin):
-    success_url: str = Form("/admin/pedidos"),
-    failure_url: str = Form("/admin/pedidos"),
-    pending_url: str = Form("/admin/pedidos"),
-    admin_user: dict = Depends(require_admin),
-):
-    sdk, err = _get_mp_client()
-    if err:
-        return JSONResponse({"ok": False, "error": err}, status_code=500)
-
-    unit_price = float(int(total_clp or 0))  # MP usa float, CLP sin decimales
-
-    preference = {
-        "items": [{
-            "title": titulo or "Pedido Farmactiva",
-            "description": descripcion or "",
-            "quantity": 1,
-            "currency_id": "CLP",
-            "unit_price": unit_price,
-        }],
-        "auto_return": "approved",
-        "back_urls": {
-            "success": success_url,
-            "failure": failure_url,
-            "pending": pending_url,
-        },
-        "external_reference": external_reference or "",
-        "payer": {"email": email_cliente} if email_cliente else {},
-        # "notification_url": "https://TU_DOMINIO/mercadopago/webhook"  # si ya tienes público
-    }
-
-    try:
-        pref = sdk.preference().create(preference)
-        body = pref.get("response", {})
-        return {
-            "ok": True,
-            "id": body.get("id"),
-            "init_point": body.get("init_point"),
-            "sandbox_init_point": body.get("sandbox_init_point"),
-        }
-    except Exception as e:
-        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
-
-
 @router.get("/pagos/mercadopago/callback")
 def mp_callback_collector(
     status: str = Query(None),
     payment_id: str = Query(None, alias="payment_id"),
     preference_id: str = Query(None, alias="preference_id"),
     external_reference: str = Query(None),
-    admin_user: dict = Depends(require_admin),
+    admin_user: dict = Depends(require_staff),
 ):
     # Simplemente redirigimos al listado con un pequeño estado en QS
     url = f"/admin/pedidos?mp_status={status or ''}&payment_id={payment_id or ''}&pref={preference_id or ''}"
@@ -917,12 +929,12 @@ async def mp_webhook(payload: dict):
 # =========================================================
 # Etiqueta Envio
 # =========================================================
-@router.get("/admin/pedidos/{id_pedido}/etiqueta", response_class=HTMLResponse)
+@router.get("/{id_pedido}/etiqueta", response_class=HTMLResponse)
 def admin_pedido_etiqueta(
     id_pedido: int,
     request: Request,
     db: Session = Depends(get_db),
-    admin_user: dict = Depends(require_admin),
+    admin_user: dict = Depends(require_staff),
 ):
     print(f"[pedidos/etiqueta] GET id={id_pedido}")
 
@@ -1088,95 +1100,48 @@ def fetch_envio_direccion(db, id_dir: Optional[int], id_cliente: Optional[int]):
     # Nada encontrado
     return None
 
-def _next_states_for(db: Session, current_code: Optional[str]) -> list[dict]:
+# --- Fuente única de verdad: transiciones en BD ---
+def _next_states_for(db, estado_actual: str | None) -> list[dict]:
     """
-    Devuelve [{codigo, nombre}] con los estados permitidos *siguientes* al estado actual.
-    Reglas de negocio:
-      - NUEVO -> APROBADO_QF | APROBADO_CRITERIO_QF | RECHAZADO_QF
-      - APROBADO_QF -> PREPARANDO
-      - APROBADO_CRITERIO_QF -> PREPARANDO
-      - PREPARANDO -> ENVIADO
-      - ENVIADO -> ENTREGADO
-    Si existen columnas next_codes/siguiente/orden en 'pedido_estados', se usan por encima
-    (para no romper catálogos ya definidos).
+    Devuelve la lista de estados destino válidos para un estado actual (por código).
+    Lee desde public.pedido_estado_transiciones (origen/destino por id).
     """
-    cur = (current_code or "").strip()
-    cur_upper = cur.upper()
+    if not estado_actual:
+        return []
+    
+    if (estado_actual or "").upper() == "RECHAZADO_QF":
+        return []  # estado final, no tiene siguientes
 
-    # 0) Reglas explícitas
-    explicit = {
-        "NUEVO": ["APROBADO_QF", "APROBADO_CRITERIO_QF", "RECHAZADO_QF"],
-        "APROBADO_QF": ["PREPARANDO"],
-        "APROBADO_CRITERIO_QF": ["PREPARANDO"],
-        "PREPARANDO": ["ENVIADO"],
-        "ENVIADO": ["ENTREGADO"],
-    }
-    if cur_upper in explicit:
-        desired = explicit[cur_upper]
-    else:
-        desired = []
 
-    # 1) Intentar respetar catálogo si tiene transiciones declaradas
+    sql = text("""
+        SELECT
+            dest.codigo AS codigo,
+            COALESCE(NULLIF(dest.nombre, ''), dest.codigo) AS nombre,
+            dest.rol_responsable
+        FROM public.pedido_estado_transiciones t
+        JOIN public.pedido_estados orig ON orig.id_estado = t.origen
+        JOIN public.pedido_estados dest ON dest.id_estado = t.destino
+        WHERE UPPER(orig.codigo) = UPPER(:cur)
+          AND t.activo = TRUE
+          AND dest.activo = TRUE
+        ORDER BY dest.orden NULLS LAST, dest.codigo
+    """)
+
     try:
-        cols = db.execute(text("""
-            SELECT lower(column_name)
-              FROM information_schema.columns
-             WHERE table_schema='public' AND table_name='pedido_estados'
-        """)).scalars().all()
-        cols = set(cols)
-    except Exception:
-        cols = set()
-
-    def _csv_to_codes(s: Optional[str]) -> list[str]:
-        return [x.strip() for x in (s or "").split(",") if x.strip()]
-
-    # next_codes o siguiente (CSV) tienen prioridad si existen
-    for col in ("next_codes", "siguiente"):
-        if col in cols:
-            try:
-                row = db.execute(
-                    text(f"SELECT {col} FROM public.pedido_estados WHERE upper(codigo)=upper(:c) LIMIT 1"),
-                    {"c": cur}
-                ).mappings().first()
-                cand = _csv_to_codes(row[col]) if row and row.get(col) else []
-                if cand:
-                    desired = cand  # catálogo manda
-            except Exception:
-                pass
-
-    # orden: si existe y no hay desired explícito, usar inmediato siguiente
-    if not desired and "orden" in cols:
-        try:
-            cur_ord = db.execute(
-                text("SELECT orden FROM public.pedido_estados WHERE upper(codigo)=upper(:c) LIMIT 1"),
-                {"c": cur},
-            ).scalar()
-            if cur_ord is not None:
-                rows = db.execute(text("""
-                    SELECT codigo, COALESCE(NULLIF(nombre,''), codigo) AS nombre
-                      FROM public.pedido_estados
-                     WHERE orden > :o
-                     ORDER BY orden ASC
-                     LIMIT 1
-                """), {"o": cur_ord}).mappings().all()
-                return [dict(r) for r in rows]
-        except Exception:
-            pass
-
-    # Materializar salida (con nombres del catálogo si están)
-    out: list[dict] = []
-    for code in desired:
-        try:
-            r = db.execute(text("""
-                SELECT codigo, COALESCE(NULLIF(nombre,''), codigo) AS nombre
-                  FROM public.pedido_estados
-                 WHERE upper(codigo) = upper(:c)
-                 LIMIT 1
-            """), {"c": code}).mappings().first()
-            out.append(dict(r) if r else {"codigo": code, "nombre": code})
-        except Exception:
-            out.append({"codigo": code, "nombre": code})
-    return out
+        rows = db.execute(sql, {"cur": estado_actual}).mappings().all()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        # Fallback defensivo si la tabla no existe o hay un problema puntual
+        print(f"[pedidos/_next_states_for] error consultando transiciones: {e}")
+        sql_fallback = text("""
+            SELECT codigo,
+                   COALESCE(NULLIF(nombre,''), codigo) AS nombre,
+                   rol_responsable
+            FROM public.pedido_estados
+            WHERE activo = TRUE AND UPPER(codigo) <> UPPER(:cur)
+            ORDER BY orden NULLS LAST, codigo
+        """)
+        return [dict(r) for r in db.execute(sql_fallback, {"cur": estado_actual}).mappings().all()]
 
 SQL_PEDIDO_HEADER = text("""
 SELECT
@@ -1222,6 +1187,43 @@ SQL_PEDIDO_ITEMS = text("""
   ORDER BY i.id_item
 """)
 
+def _notify_qf_new_order(db: Session, id_pedido: int, numero: str | None = None) -> None:
+    """
+    Notifica a todos los QF activos que existe un nuevo pedido para revisión.
+    En dev: si falta configuración SMTP, solo hace print().
+    """
+    q = (
+        select(Usuario)
+        .join(UsuarioRol, UsuarioRol.id_usuario == Usuario.id)
+        .where(UsuarioRol.rol == "qf", Usuario.activo.is_(True))
+    )
+    usuarios_qf = db.execute(q).scalars().all()
+
+    subject = f"Nuevo pedido #{numero or id_pedido} requiere revisión QF"
+    link = f"{BASE_URL_ADMIN}/admin/pedidos/{id_pedido}"
+    text = (
+        f"Se ha creado el pedido #{numero or id_pedido} y requiere aprobación del Químico Farmacéutico.\n\n"
+        f"Ver pedido: {link}"
+    )
+    html = f"<p>Se ha creado el pedido <strong>#{numero or id_pedido}</strong> y requiere aprobación del QF.</p><p><a href='{link}'>Ver pedido</a></p>"
+
+    if not usuarios_qf:
+        print(f"[MAIL][QF] No hay QF activos para notificar -> {subject}")
+        return
+
+    for u in usuarios_qf:
+        correo = getattr(u, "correo", None) or getattr(u, "email", None)
+        try:
+            ok = False
+            if correo:
+                ok = send_email(to=correo, subject=subject, html=html, text=text)
+            if not ok:
+                # Modo dev o SMTP incompleto: deja rastro igual
+                print(f"[MAIL][QF][DEV] TO={correo or u.usuario} subj='{subject}' -> {link}")
+        except Exception as e:
+            print(f"[MAIL][QF] Error notificando a {correo or u.usuario}: {e}")
+
+
 # --------------------------------------------
 # SQL para NOTAS del pedido (timeline)
 # --------------------------------------------
@@ -1239,13 +1241,14 @@ SQL_PED_NOTA_INSERT = text("""
   RETURNING id_nota
 """)
 
-@router.get("/admin/pedidos/{id_pedido}")
+@router.get("/{id_pedido}", response_class=HTMLResponse)
 def admin_pedidos_detalle(
     id_pedido: int,
     request: Request,
     db: Session = Depends(get_db),
-    admin_user: dict = Depends(require_admin),
+    admin_user: dict = Depends(require_staff),
 ):
+    # Header
     header = db.execute(SQL_PEDIDO_HEADER, {"id": id_pedido}).mappings().first()
     if not header:
         return RedirectResponse(url="/admin/pedidos?err=not_found", status_code=303)
@@ -1260,17 +1263,72 @@ def admin_pedidos_detalle(
         print(f"[pedidos] notas no disponibles: {e}")
         notas = []
 
-    # Dirección de envío
+    # Dirección de envío / facturación
     envio_dir = fetch_envio_direccion(
         db,
         header.get("id_direccion_envio"),
-        header.get("id_cliente")
+        header.get("id_cliente"),
     )
     fact_dir = envio_dir  # por ahora = envío
 
-    # >>> SOLO SIGUIENTES ESTADOS <<<
-    estados = _next_states_for(db, header.get("estado_codigo"))
-    print(f"[pedidos] estado actual={header.get('estado_codigo')} siguientes={ [e['codigo'] for e in estados] }")
+    # Próximos estados permitidos (desde la BD de transiciones)
+    cur_code = header.get("estado_codigo")
+    estados = _next_states_for(db, cur_code)
+    print(f"[pedidos] estado actual={cur_code} siguientes={[e['codigo'] for e in estados]}")
+
+    # Roles de flujo para el combo "Rol destinatario"
+    roles_combo = _workflow_roles(db)
+
+    # Rol por defecto = rol_responsable del primer estado siguiente (si existe)
+    default_dest = None
+    if estados:
+        try:
+            default_dest = estados[0].get("rol_responsable")
+        except Exception:
+            default_dest = None
+    print(f"[pedidos] rol destinatario sugerido={default_dest}")
+
+    # -------------------------------
+    # NUEVO: datos de logística
+    # -------------------------------
+
+    # Transportista vigente (vista v_pedido_transportista_vigente) – tolerante si no existe
+    carrier = {}
+    try:
+        carrier = db.execute(text("""
+            SELECT transportista_nombre, tracking_ext, estado_logistico
+            FROM public.v_pedido_transportista_vigente
+            WHERE id_pedido = :id
+            LIMIT 1
+        """), {"id": id_pedido}).mappings().first() or {}
+    except Exception as e:
+        print(f"[pedidos] carrier no disponible: {e}")
+        carrier = {}
+
+    # Eventos logísticos (pedido_envio_eventos) – tolerante si no existe
+    try:
+        eventos_envio = db.execute(text("""
+            SELECT id_evento, estado, nota, actor, actor_usuario, creado_en
+            FROM public.pedido_envio_eventos
+            WHERE id_pedido = :id
+            ORDER BY creado_en DESC, id_evento DESC
+        """), {"id": id_pedido}).mappings().all()
+    except Exception as e:
+        print(f"[pedidos] eventos_envio no disponibles: {e}")
+        eventos_envio = []
+
+    # Combo de transportistas activos para el modal “Asignar transportista”
+    # (si la tabla no existe o falla, dejamos lista vacía para no romper la vista)
+    try:
+        transportistas_activos = db.execute(text("""
+            SELECT id_transportista, nombre, rut
+            FROM public.transportistas
+            WHERE activo = TRUE
+            ORDER BY nombre
+        """)).mappings().all()
+    except Exception as e:
+        print(f"[pedidos] no fue posible cargar transportistas: {e}")
+        transportistas_activos = []
 
     return templates.TemplateResponse(
         "admin_pedido_detalle.html",
@@ -1282,10 +1340,16 @@ def admin_pedidos_detalle(
             "fact_dir": fact_dir,
             "admin_user": admin_user,
             "notas": notas,
-            "estados": estados,  # el modal ahora verá solo los permitidos
+            "estados": estados,              # solo los permitidos
+            "roles_combo": roles_combo,      # opciones del combo
+            "default_dest": default_dest,    # preselección del combo
+
+            # 👇 NUEVO en el contexto
+            "carrier": carrier,                              # transportista vigente/tracking/estado_logistico
+            "eventos_envio": eventos_envio,                  # traza logística
+            "transportistas_activos": transportistas_activos # para el modal de asignación
         },
     )
-
 
 # === Helpers de dirección de envío ===
 def _read_envio_from_form(form) -> dict:
@@ -1313,11 +1377,41 @@ def _read_envio_from_form(form) -> dict:
         "referencia":   g("referencia") or None,
     }
 
+# --- Roles de flujo tomados desde pedido_estados ---
+ROLE_LABELS = {
+    "QF": "Químico Farmacéutico",
+    "PREPARACION": "Preparación",
+    "LOGISTICA": "Logística",
+    "ATENCION": "Atención",
+    "TRANSPORTISTA": "Transportista",
+}
+
+SQL_WORKFLOW_ROLES = text("""
+    SELECT DISTINCT rol_responsable
+    FROM public.pedido_estados
+    WHERE activo = TRUE
+      AND NULLIF(TRIM(rol_responsable), '') IS NOT NULL
+    ORDER BY rol_responsable
+""")
+
+def _workflow_roles(db):
+    rows = db.execute(SQL_WORKFLOW_ROLES).scalars().all()
+    # Mapea a etiqueta legible
+    out = []
+    for code in rows:
+        code = (code or "").strip()
+        if not code:
+            continue
+        out.append({
+            "code": code,
+            "name": ROLE_LABELS.get(code, code.title().replace("_", " "))
+        })
+    return out
 
 # ==============================
 # POST: Crear nueva nota del pedido
 # ==============================
-@router.post("/admin/pedidos/{id_pedido}/notas/nueva")
+@router.post("/{id_pedido}/notas/nueva")
 def admin_pedidos_nota_nueva(
     id_pedido: int,
     request: Request,
@@ -1325,7 +1419,7 @@ def admin_pedidos_nota_nueva(
     audiencia: str = Form("interno"),        # 'interno' o 'cliente'
     destinatario_rol: str = Form(""),        # opcional (bodega/ventas/reparto/cliente)
     db: Session = Depends(get_db),
-    admin_user: dict = Depends(require_admin),
+    admin_user: dict = Depends(require_staff),
 ):
     autor_nombre = admin_user.get("nombre") or admin_user.get("username") or "admin"
     autor_rol = "admin"

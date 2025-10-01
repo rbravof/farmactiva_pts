@@ -1,0 +1,107 @@
+{% extends "base_admin.html" %}
+{% block title %}{{ 'Nuevo' if mode=='create' else 'Editar' }} usuario | Admin{% endblock %}
+
+{% block content %}
+<div class="bg-white border rounded-xl shadow p-5 max-w-2xl">
+  <h1 class="text-xl font-semibold mb-4">
+    {{ 'Nuevo usuario' if mode=='create' else 'Editar usuario' }}
+  </h1>
+
+  {% if error %}
+    <div class="mb-4 px-3 py-2 rounded bg-red-50 text-red-700 text-sm">
+      {{ error }}
+    </div>
+  {% endif %}
+
+  {# bandera robusta #}
+  {% set create_mode = (mode == 'create') %}
+  {# valores del form (para create/errores). Si no viene, usamos {} #}
+  {% set f = form if form is defined else {} %}
+
+  <form method="post" action="{{ '/admin/usuarios/guardar' if create_mode else '/admin/usuarios/' ~ u.id ~ '/actualizar' }}">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {% if create_mode %}
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">Usuario (login)</label>
+        <input name="usuario" required maxlength="80"
+               value="{{ f.usuario or '' }}"
+               class="w-full border rounded px-3 py-2" />
+      </div>
+      {% else %}
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">Usuario (login)</label>
+        <input value="{{ u.usuario }}" disabled class="w-full border rounded px-3 py-2 bg-gray-50 text-gray-500" />
+      </div>
+      {% endif %}
+
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">RUT</label>
+        <input name="rut" required
+               value="{{ (f.rut if create_mode else u.rut) if (f or u) else '' }}"
+               class="w-full border rounded px-3 py-2" placeholder="12.345.678-9"/>
+      </div>
+
+      <div class="md:col-span-2">
+        <label class="block text-sm text-gray-600 mb-1">Nombre completo</label>
+        <input name="nombre" required
+               value="{{ (f.nombre if create_mode else u.nombre) if (f or u) else '' }}"
+               class="w-full border rounded px-3 py-2"/>
+      </div>
+
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">Rol</label>
+        {% set rol_sel = (f.rol if create_mode else (rol or 'aux')) %}
+        <select name="rol" required class="w-full border rounded px-3 py-2">
+          <option value="admin"         {{ 'selected' if rol_sel=='admin' }}>Administrador</option>
+          <option value="qf"            {{ 'selected' if rol_sel=='qf' }}>Químico Farmacéutico</option>
+          <option value="aux"           {{ 'selected' if rol_sel=='aux' or not rol_sel }}>Auxiliar de Farmacia</option>
+          <option value="transportista" {{ 'selected' if rol_sel=='transportista' }}>Transportista</option>
+        </select>
+      </div>
+
+      {% if not create_mode %}
+      <div class="flex items-center gap-2 mt-6">
+        <label class="inline-flex items-center">
+          <input type="checkbox" name="activo" {% if u.activo %}checked{% endif %} class="mr-2"> Activo
+        </label>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="mt-6 border-t pt-4">
+      {% if create_mode %}
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm text-gray-600 mb-1">Contraseña</label>
+          <input name="password" type="password" class="w-full border rounded px-3 py-2"
+                 placeholder="O marca 'Generar temporal'"/>
+        </div>
+        <label class="inline-flex items-center mt-6">
+          <input type="checkbox" name="temp" class="mr-2"> Generar temporal
+        </label>
+      </div>
+      {% else %}
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <label class="inline-flex items-center">
+          <input type="checkbox" name="cambiar_password" class="mr-2">
+          Cambiar contraseña
+        </label>
+        <div>
+          <label class="block text-sm text-gray-600 mb-1">Nueva contraseña</label>
+          <input name="password" type="password" class="w-full border rounded px-3 py-2"
+                 placeholder="O marca 'Generar temporal'"/>
+        </div>
+        <label class="inline-flex items-center">
+          <input type="checkbox" name="temp" class="mr-2"> Generar temporal
+        </label>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="mt-6 flex items-center gap-2">
+      <button class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Guardar</button>
+      <a href="/admin/usuarios" class="px-4 py-2 border rounded hover:bg-gray-50">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

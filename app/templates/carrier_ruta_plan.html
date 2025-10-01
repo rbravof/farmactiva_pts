@@ -1,0 +1,199 @@
+{% extends "base_carrier.html" %}
+{% block title %}Ruta optimizada{% endblock %}
+
+{% block content %}
+<main class="page">
+  <div class="wrap space-y-4">
+    <h1 class="text-xl font-semibold">Ruta optimizada</h1>
+
+    <!-- Form de origen -->
+    <section class="p-4 rounded-2xl border">
+    <div class="flex items-start justify-between gap-3">
+        <div class="flex-1">
+        <label class="block text-sm mb-1">Punto de partida</label>
+        <form id="frmOrigin" class="flex flex-col sm:flex-row gap-2">
+            <input id="txtOrigin" name="origin" class="p-2 rounded border flex-1"
+                placeholder="Dirección de origen"
+                value="{{ origin or '' }}">
+            <button class="px-3 py-2 rounded-xl border hover:bg-gray-50">Recalcular</button>
+        </form>
+        {% if origin_ref %}
+            <p class="text-xs text-gray-500 mt-1">Referencia bodega: {{ origin_ref }}</p>
+        {% endif %}
+        <p class="text-xs text-gray-500 mt-1">Si modificas la dirección, se recalculará desde esa ubicación.</p>
+        </div>
+        <div class="text-right text-sm text-gray-600">
+        <div class="font-medium">{{ origin_nombre or 'Bodega' }}</div>
+        <div>{{ origin or 'Sin dirección' }}</div>
+        </div>
+    </div>
+    </section>
+
+    <!-- Lista simple de paradas -->
+    <section class="p-4 rounded-2xl border">
+      <h3 class="font-medium mb-2">Paradas seleccionadas</h3>
+      <ol class="list-decimal list-inside text-sm space-y-1" id="stopsList">
+        {% for p in pedidos %}
+          <li data-id="{{ p.id_pedido }}">
+            #{{ p.numero }} – {{ p.cliente_nombre }}
+            <span class="text-gray-600">
+              ({{ (p.calle ~ ' ' ~ (p.calle_numero or '')) | trim }}
+              {% if p.depto %} {{ p.depto }}{% endif %}
+              {% if p.comuna %}, {{ p.comuna }}{% endif %}
+              {% if p.region %}, {{ p.region }}{% endif %})
+            </span>
+          </li>
+        {% endfor %}
+      </ol>
+    </section>
+
+    <!-- Mapa -->
+    <section class="p-1 rounded-2xl border">
+      <div id="map" class="w-full h-96"></div>
+    </section>
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+
+<script>
+(function(){
+  // --- Datos desde servidor ---
+  const ORIGIN_LAT = {{ origin_lat if origin_lat is not none else 'null' }};
+  const ORIGIN_LON = {{ origin_lon if origin_lon is not none else 'null' }};
+  const ORIGIN_TXT = "{{ (origin or '') | replace('"','') }}";
+  const ORIGIN_HAS_COORDS = (ORIGIN_LAT !== null && ORIGIN_LON !== null);
+
+  // Paradas (igual que antes)
+  const rawStops = [
+    {% for p in pedidos %}
+    {
+      id: {{ p.id_pedido }},
+      label: "#{{ p.numero }} · {{ p.cliente_nombre|replace('"','') }}",
+      addr: "{{ (p.calle ~ ' ' ~ (p.calle_numero or ''))|trim }}{% if p.depto %} {{ p.depto }}{% endif %}{% if p.comuna %}, {{ p.comuna }}{% endif %}{% if p.region %}, {{ p.region }}{% endif %}, Chile"
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  const nominatim = async (query) => {
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&countrycodes=cl&q=' + encodeURIComponent(query);
+    const r = await fetch(url, {headers:{'Accept':'application/json'}});
+    if (!r.ok) throw new Error('geocode fail');
+    const j = await r.json();
+    if (!j || !j[0]) throw new Error('no result');
+    return {lat: +j[0].lat, lon: +j[0].lon};
+  };
+
+  const hav = (a,b) => {
+    const R=6371e3, toRad=x=>x*Math.PI/180;
+    const dLat=toRad(b.lat-a.lat);
+    const dLon=toRad(b.lon-a.lon);
+    const s1=Math.sin(dLat/2), s2=Math.sin(dLon/2);
+    const aa=s1*s1 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*s2*s2;
+    return 2*R*Math.asin(Math.sqrt(aa));
+  };
+
+  let waypoints = [];  // {id,label,addr,lat,lon}
+
+  async function geocodeAllStops() {
+    waypoints = [];
+    for (const s of rawStops) {
+      try {
+        const pt = await nominatim(s.addr);
+        waypoints.push({...s, ...pt});
+      } catch(e) {
+        console.warn('Geocode fallo en', s.addr, e);
+      }
+    }
+    return waypoints.length > 0;
+  }
+
+  function nearestOrder(start, pts) {
+    const left = pts.slice();
+    const ordered = [];
+    let cur = start;
+    while (left.length) {
+      let bestI = 0, bestD = Infinity;
+      for (let i=0;i<left.length;i++){
+        const d = hav(cur, left[i]);
+        if (d < bestD) { bestD = d; bestI = i; }
+      }
+      const next = left.splice(bestI,1)[0];
+      ordered.push(next);
+      cur = next;
+    }
+    return ordered;
+  }
+
+  let map, markersLayer, routeLayer;
+  function ensureMap(center) {
+    if (!map) {
+      map = L.map('map', {scrollWheelZoom:false}).setView([center.lat, center.lon], 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19}).addTo(map);
+      markersLayer = L.layerGroup().addTo(map);
+    }
+  }
+  function clearRoute() {
+    if (markersLayer) markersLayer.clearLayers();
+    if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+  }
+
+  async function drawRoute(start, ordered) {
+    ensureMap(start);
+    clearRoute();
+
+    L.marker([start.lat, start.lon]).addTo(markersLayer).bindPopup("Inicio").openPopup();
+    ordered.forEach((p,i)=>{
+      L.marker([p.lat, p.lon]).addTo(markersLayer).bindPopup((i+1)+". "+p.label);
+    });
+
+    const coords = [[start.lat, start.lon], ...ordered.map(p=>[p.lat,p.lon])];
+    const q = coords.map(c => c[1].toFixed(6)+','+c[0].toFixed(6)).join(';');
+    const url = 'https://router.project-osrm.org/route/v1/driving/' + q + '?overview=full&geometries=geojson';
+    try {
+      const r = await fetch(url);
+      const j = await r.json();
+      const line = j.routes && j.routes[0] && j.routes[0].geometry;
+      if (line) {
+        routeLayer = L.geoJSON(line).addTo(map);
+        const b = L.geoJSON(line).getBounds();
+        map.fitBounds(b, {padding:[20,20]});
+      }
+    } catch(e) {
+      console.warn('OSRM fallo', e);
+    }
+  }
+
+  async function getStartPoint() {
+    // Si tenemos lat/lon desde Bodega -> úsalo
+    if (ORIGIN_HAS_COORDS) return {lat: ORIGIN_LAT, lon: ORIGIN_LON};
+    // Si no, geocodifica el texto (si existe)
+    const txt = (document.getElementById('txtOrigin').value || '').trim() || ORIGIN_TXT;
+    if (txt) {
+      try { return await nominatim(txt + ', Chile'); } catch {}
+    }
+    // Fallback: primer destino
+    return {lat: waypoints[0].lat, lon: waypoints[0].lon};
+  }
+
+  async function recalc() {
+    if (waypoints.length === 0) await geocodeAllStops();
+    if (waypoints.length === 0) return;
+    const start = await getStartPoint();
+    const ordered = nearestOrder(start, waypoints);
+    await drawRoute(start, ordered);
+  }
+
+  document.getElementById('frmOrigin').addEventListener('submit', (e)=>{
+    e.preventDefault();
+    recalc();
+  });
+
+  recalc();
+})();
+</script>
+{% endblock %}
+

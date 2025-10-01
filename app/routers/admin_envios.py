@@ -1,12 +1,12 @@
 # app/routers/admin_envios.py
-from fastapi import APIRouter, Depends, Request, Form
+from fastapi import APIRouter, Depends, Request, Form, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-
+from typing import Optional
 from app.database import get_db
-from app.routers.admin_security import require_admin
+from app.routers.admin_security import require_admin, require_staff
 
 # --------------------------------
 # Routers
@@ -325,5 +325,128 @@ def envios_tarifas_delete(id_tarifa: int, db: Session = Depends(get_db), admin_u
     db.commit()
     return RedirectResponse(url="/admin/envios/tarifas", status_code=303)
 
+# =======================================
+# Envíos: tipos y cálculo dinámico tarifa
+# =======================================
+
+# 3.1) Listado de tipos de envío activos (para poblar el <select>)
+@router.get("/admin/api/envios/tipos")
+def api_envios_tipos(db: Session = Depends(get_db)):
+    rows = db.execute(text("""
+        SELECT id_tipo_envio AS id, codigo, nombre, requiere_direccion
+        FROM public.tipos_envio
+        WHERE activo = TRUE
+        ORDER BY orden ASC, nombre ASC
+    """)).mappings().all()
+    # devolvemos lista simple para que el HTML pueda iterarla
+    return {"ok": True, "items": rows}
+
+
+# 3.2) Cálculo de costo de envío con reglas por comuna / región / default
+@router.get("/admin/api/envios/tarifa")
+def api_envios_tarifa(
+    id_tipo_envio: int = Query(...),
+    id_comuna: int | None = Query(None),
+    id_region: int | None = Query(None),
+    subtotal_items: int = Query(0),             # total de ítems (CLP, sin IVA si así decides)
+    peso_total_g: int | None = Query(None),     # opcional si manejas pesos
+    db: Session = Depends(get_db),
+):
+    """
+    Selecciona la mejor regla:
+      1) match por comuna (activo)
+      2) match por región (activo)
+      3) regla 'por defecto' (sin comuna/ región)
+    respetando prioridad (menor = más específica).
+    Aplica gratis_desde si corresponde.
+    """
+    params = {
+        "id_tipo": id_tipo_envio,
+        "id_comuna": id_comuna,
+        "id_region": id_region,
+        "peso": peso_total_g,
+    }
+
+    sql = """
+    WITH cand AS (
+      SELECT
+        t.id_tarifa, t.base_clp, t.gratis_desde, t.prioridad,
+        CASE WHEN t.id_comuna IS NOT NULL THEN 1
+             WHEN t.id_region IS NOT NULL THEN 2
+             ELSE 3 END AS nivel
+      FROM public.envio_tarifas t
+      WHERE t.id_tipo_envio = :id_tipo
+        AND t.activo = TRUE
+        AND COALESCE(:peso, 0) >= COALESCE(t.peso_min_g, 0)
+        AND (t.peso_max_g IS NULL OR COALESCE(:peso, 0) <= t.peso_max_g)
+        AND (
+              (:id_comuna IS NOT NULL AND t.id_comuna = :id_comuna)
+           OR (:id_comuna IS NULL  AND :id_region IS NOT NULL AND t.id_region = :id_region)
+           OR (t.id_comuna IS NULL AND t.id_region IS NULL)
+        )
+    )
+    SELECT base_clp, gratis_desde
+    FROM cand
+    ORDER BY nivel ASC, prioridad ASC
+    LIMIT 1;
+    """
+    row = db.execute(text(sql), params).mappings().first()
+    if not row:
+        return {"ok": True, "costo": 0, "motivo": "sin_regla"}
+
+    costo = int(row["base_clp"] or 0)
+    if row["gratis_desde"] is not None and subtotal_items >= int(row["gratis_desde"]):
+        costo = 0
+    return {"ok": True, "costo": costo}
+
+# Variante interna usada por el paso 2 (compatibilidad con tu HTML actual)
+@router.get("/admin/envios/tarifa")
+def admin_envios_tarifa(
+    id_tipo_envio: int = Query(..., alias="id_tipo_envio"),
+    id_region: Optional[int] = Query(None),
+    id_comuna: Optional[int] = Query(None),
+    subtotal: int = Query(0),  # subtotal neto de ítems (sin IVA)
+    db: Session = Depends(get_db),
+    admin_user: dict = Depends(require_staff),
+):
+    rows = db.execute(text("""
+        SELECT
+            t.id_tarifa, t.base_clp, t.gratis_desde, t.prioridad,
+            t.id_region, t.id_comuna
+        FROM public.envio_tarifas t
+        WHERE t.activo = TRUE
+          AND t.id_tipo_envio = :tipo
+          AND (:id_comuna IS NULL OR t.id_comuna IS NULL OR t.id_comuna = :id_comuna)
+          AND (:id_region IS NULL OR t.id_region IS NULL OR t.id_region = :id_region)
+        ORDER BY
+          CASE WHEN t.id_comuna IS NOT NULL THEN 0
+               WHEN t.id_region IS NOT NULL THEN 1
+               ELSE 2 END,
+          t.prioridad ASC, t.base_clp ASC
+        LIMIT 1
+    """), {
+        "tipo": id_tipo_envio,
+        "id_region": id_region,
+        "id_comuna": id_comuna,
+    }).mappings().all()
+
+    if not rows:
+        return {"ok": True, "costo": 0, "aplicado_gratis": False}
+
+    t = rows[0]
+    costo = int(t["base_clp"] or 0)
+    aplicado_gratis = False
+    if t["gratis_desde"] is not None and subtotal >= int(t["gratis_desde"]):
+        costo = 0
+        aplicado_gratis = True
+
+    return {
+        "ok": True,
+        "costo": costo,
+        "aplicado_gratis": aplicado_gratis,
+        "id_tarifa": t["id_tarifa"],
+    }
+
 # <- MUY IMPORTANTE: incluir el sub-router API dentro del router principal
 router.include_router(api)
+

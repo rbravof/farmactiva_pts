@@ -1,0 +1,77 @@
+{% extends "base_admin.html" %}
+{% block title %}Transiciones de estados | Admin{% endblock %}
+
+{% block content %}
+<div class="bg-white border rounded-xl shadow p-5">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-xl font-semibold">Transiciones de estados</h1>
+    <div class="space-x-2">
+      <a href="/admin/config/estados-pedido" class="px-3 py-2 text-sm border rounded hover:bg-gray-50">Volver</a>
+      <button type="button" id="btn-todos" class="px-3 py-2 text-sm border rounded hover:bg-gray-50">Marcar todos</button>
+      <button type="button" id="btn-ninguno" class="px-3 py-2 text-sm border rounded hover:bg-gray-50">Desmarcar todos</button>
+    </div>
+  </div>
+
+  <form method="post" action="/admin/config/estados-pedido/transiciones">
+    <div class="overflow-auto">
+      <table class="min-w-full text-sm">
+        <thead>
+          <tr class="text-left text-gray-500 border-b">
+            <th class="py-2 pr-3">Origen \ Destino</th>
+            {% for d in estados %}
+              <th class="py-2 px-2 text-center">
+                <div class="font-medium">{{ d.codigo }}</div>
+                <div class="text-xs text-gray-500">{{ d.rol_responsable }}</div>
+              </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for o in estados %}
+          <tr class="border-b">
+            <th class="py-2 pr-3 whitespace-nowrap">
+              <div class="font-medium">{{ o.codigo }}</div>
+              <div class="text-xs text-gray-500">{{ o.rol_responsable }}</div>
+            </th>
+
+            {% for d in estados %}
+              <td class="py-1 px-2 text-center">
+                {% if o.id_estado == d.id_estado %}
+                  <span class="text-gray-300">—</span>
+                {% else %}
+                  {% set key = (o.id_estado, d.id_estado) %}
+                  <input type="checkbox"
+                         name="t_{{ o.id_estado }}_{{ d.id_estado }}"
+                         class="h-4 w-4"
+                         {% if key in checked %}checked{% endif %}>
+                {% endif %}
+              </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-5 flex justify-end gap-2">
+      <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+        Guardar cambios
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const btnTodos   = document.getElementById('btn-todos');
+  const btnNinguno = document.getElementById('btn-ninguno');
+
+  btnTodos?.addEventListener('click', () => {
+    document.querySelectorAll('input[type=checkbox][name^="t_"]').forEach(chk => { chk.checked = true; });
+  });
+  btnNinguno?.addEventListener('click', () => {
+    document.querySelectorAll('input[type=checkbox][name^="t_"]').forEach(chk => { chk.checked = false; });
+  });
+</script>
+{% endblock %}

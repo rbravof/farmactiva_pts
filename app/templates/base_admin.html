@@ -31,6 +31,32 @@
     <!-- Sidebar -->
     <aside class="col-span-12 md:col-span-3 lg:col-span-3">
       {% set path = request.url.path %}
+      {# Detección robusta de rol:
+         - Funciona si user es objeto o dict.
+         - is_admin: true si viene rol='admin' o flags is_admin/es_admin/admin.
+         - is_aux:   true si rol='aux'.
+      #}
+      {% set is_mapping = user is mapping %}
+      {% set has_attr = user is defined and not is_mapping %}
+      {% set is_admin =
+          user and (
+            (has_attr and user.rol is defined and user.rol == 'admin') or
+            (has_attr and user.is_admin is defined and user.is_admin) or
+            (has_attr and user.es_admin is defined and user.es_admin) or
+            (has_attr and user.admin is defined and user.admin) or
+            (is_mapping and user.get('rol') == 'admin') or
+            (is_mapping and user.get('is_admin')) or
+            (is_mapping and user.get('es_admin')) or
+            (is_mapping and user.get('admin'))
+          )
+      %}
+      {% set is_aux =
+          user and (
+            (has_attr and user.rol is defined and user.rol == 'aux') or
+            (is_mapping and user.get('rol') == 'aux')
+          )
+      %}
+
       <nav class="bg-white border rounded-xl shadow p-3 space-y-1">
         <div class="px-2 py-1 text-xs uppercase text-gray-500">Catálogo</div>
 
@@ -46,15 +72,23 @@
            class="block px-3 py-2 rounded {{ 'bg-gray-100 text-gray-900 font-medium' if path.startswith('/admin/productos') else 'text-gray-700 hover:bg-gray-50' }}">
           Productos
         </a>
+
+        {# Menú e-commerce: ocultar a Auxiliar #}
+        {% if not is_aux %}
         <a href="/admin/menu"
-          class="block px-3 py-2 rounded {{ 'bg-gray-100 text-gray-900 font-medium' if path.startswith('/admin/menu') else 'text-gray-700 hover:bg-gray-50' }}">
+           class="block px-3 py-2 rounded {{ 'bg-gray-100 text-gray-900 font-medium' if path.startswith('/admin/menu') else 'text-gray-700 hover:bg-gray-50' }}">
           Menú e-commerce
         </a>
+        {% endif %}
 
         <div class="px-2 py-1 text-xs uppercase text-gray-500 mt-3">Operación</div>
 
         <a href="/admin/pedidos"
-           class="block px-3 py-2 rounded {{ 'bg-gray-100 text-gray-900 font-medium' if path.startswith('/admin/pedidos') else 'text-gray-700 hover:bg-gray-50' }}">
+           class="block px-3 py-2 rounded {{
+             'bg-gray-100 text-gray-900 font-medium'
+             if (path == '/admin/pedidos' or (path.startswith('/admin/pedidos/') and not path.startswith('/admin/pedidos/estados')))
+             else 'text-gray-700 hover:bg-gray-50'
+           }}">
           Pedidos
         </a>
         <a href="/admin/clientes"
@@ -74,22 +108,47 @@
           Tarifas de envío
         </a>
 
+        {# Usuarios & Roles: SOLO admin (detectado por cualquier flag) #}
+        {% if is_admin %}
         <a href="/admin/usuarios"
-           class="block px-3 py-2 rounded {{ 'bg-gray-100 text-gray-900 font-medium' if path.startswith('/admin/usuarios') else 'text-gray-700 hover:bg-gray-50' }}">
+          class="block px-3 py-2 rounded {{ 'bg-gray-100 text-gray-900 font-medium' if path.startswith('/admin/usuarios') else 'text-gray-700 hover:bg-gray-50' }}">
           Usuarios & Roles
         </a>
+        {% endif %}
+
 
         <a href="/admin/bodegas"
            class="block px-3 py-2 rounded {{ 'bg-gray-100 text-gray-900 font-medium' if path.startswith('/admin/bodegas') else 'text-gray-700 hover:bg-gray-50' }}">
           Bodegas
         </a>
 
-        <!-- NUEVO: Regla de Precios -->
+        {# Regla de Precios: ocultar a Auxiliar #}
+        {% if not is_aux %}
         <a href="/admin/pts/margenes"
            class="block px-3 py-2 rounded {{ 'bg-gray-100 text-gray-900 font-medium' if path.startswith('/admin/pts/margenes') else 'text-gray-700 hover:bg-gray-50' }}">
           Regla de Precios
         </a>
+        {% endif %}
 
+        {# Estados de pedido: ocultar a Auxiliar #}
+        {% if not is_aux %}
+        <a href="/admin/config/estados-pedido"
+           class="block px-3 py-2 rounded {{
+             'bg-gray-100 text-gray-900 font-medium'
+             if path.startswith('/admin/config/estados-pedido')
+             else 'text-gray-700 hover:bg-gray-50'
+           }}">
+          Estados de pedido
+        </a>
+        {% endif %}
+
+        {% if is_admin %}
+        <a href="/admin/transportistas"
+          class="block px-3 py-2 rounded {{ 'bg-gray-100 text-gray-900 font-medium' if path.startswith('/admin/transportistas') else 'text-gray-700 hover:bg-gray-50' }}">
+          Transportistas
+        </a>
+        {% endif %}
+        
       </nav>
     </aside>
 

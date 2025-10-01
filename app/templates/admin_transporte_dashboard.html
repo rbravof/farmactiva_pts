@@ -1,0 +1,78 @@
+{% extends "base_admin.html" %}
+{% block title %}Transporte - Dashboard{% endblock %}
+{% block content %}
+<main class="page">
+  <div class="wrap">
+    <h1 class="text-2xl font-semibold mb-4">Transporte — Dashboard</h1>
+
+    <!-- KPIs -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      <div class="p-4 rounded-2xl border">
+        <div class="text-sm text-gray-500">Pedidos con eventos (7d)</div>
+        <div class="text-2xl font-bold">{{ kpis.pedidos_con_eventos or 0 }}</div>
+      </div>
+      <div class="p-4 rounded-2xl border">
+        <div class="text-sm text-gray-500">Entregados (7d)</div>
+        <div class="text-2xl font-bold">{{ kpis.entregados or 0 }}</div>
+      </div>
+      <div class="p-4 rounded-2xl border">
+        <div class="text-sm text-gray-500">% On-time (≤24h)</div>
+        <div class="text-2xl font-bold">{{ kpis.pct_ontime or 0 }}%</div>
+      </div>
+      <div class="p-4 rounded-2xl border">
+        <div class="text-sm text-gray-500">Con incidencias (7d)</div>
+        <div class="text-2xl font-bold">{{ kpis.con_incidencia or 0 }}</div>
+      </div>
+    </div>
+
+    <!-- Listas -->
+    <div class="grid md:grid-cols-2 gap-6">
+      <section class="p-4 rounded-2xl border">
+        <h3 class="font-medium mb-2">Asignados / En ruta</h3>
+        <ul class="divide-y">
+          {% for r in asignados %}
+            <li class="py-2 flex justify-between">
+              <span>#{{ r.numero }} — {{ r.transportista_nombre or '—' }} ({{ r.estado }})</span>
+              <a class="text-blue-600 underline" href="/admin/pedidos/{{ r.id_pedido }}">Ver</a>
+            </li>
+          {% else %}
+            <li class="py-2 text-gray-500">Sin registros</li>
+          {% endfor %}
+        </ul>
+      </section>
+
+      <section class="p-4 rounded-2xl border">
+        <h3 class="font-medium mb-2">Entregados (recientes)</h3>
+        <ul class="divide-y">
+          {% for r in entregados %}
+            <li class="py-2 flex justify-between">
+              <span>#{{ r.numero }} — {{ r.estado }}</span>
+              <a class="text-blue-600 underline" href="/admin/pedidos/{{ r.id_pedido }}">Ver</a>
+            </li>
+          {% else %}
+            <li class="py-2 text-gray-500">Sin registros</li>
+          {% endfor %}
+        </ul>
+      </section>
+    </div>
+
+    <section class="mt-6 p-4 rounded-2xl border">
+      <h3 class="font-medium mb-2">Incidencias</h3>
+      <ul class="divide-y">
+        {% for i in incidencias %}
+          <li class="py-2">
+            <div class="text-sm text-gray-500">#{{ i.id_incidencia }} • Pedido #{{ i.id_pedido }}</div>
+            <div class="font-medium">{{ i.tipo }}</div>
+            <div class="text-sm">{{ i.descripcion or '' }}</div>
+            {% if i.foto_url %}
+              <a class="text-blue-600 underline" href="{{ i.foto_url }}" target="_blank">Ver foto</a>
+            {% endif %}
+          </li>
+        {% else %}
+          <li class="py-2 text-gray-500">Sin incidencias</li>
+        {% endfor %}
+      </ul>
+    </section>
+  </div>
+</main>
+{% endblock %}

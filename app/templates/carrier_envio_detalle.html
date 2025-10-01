@@ -1,0 +1,36 @@
+{% extends "base_carrier.html" %}
+{% block title %}Envío {{ envio.numero }} | Reparto{% endblock %}
+
+{% block content %}
+<h1 class="text-lg font-semibold mb-3">Pedido {{ envio.numero }}</h1>
+
+<div class="bg-white border rounded-lg p-4 space-y-2">
+  <div><span class="text-gray-500 text-sm">Estado:</span>
+    <span class="text-xs px-2 py-1 rounded bg-gray-100">{{ envio.estado or '—' }}</span>
+  </div>
+  <div><span class="text-gray-500 text-sm">Dirección:</span> {{ envio.direccion or '—' }}</div>
+  <div><span class="text-gray-500 text-sm">Comuna:</span> {{ envio.comuna or '—' }}</div>
+  <div><span class="text-gray-500 text-sm">Cliente:</span> {{ envio.cliente or '—' }}</div>
+  <div><span class="text-gray-500 text-sm">Teléfono:</span> {{ envio.telefono or '—' }}</div>
+</div>
+
+<form method="post" action="/carrier/envios/{{ envio.id }}/estado" class="mt-4 bg-white border rounded-lg p-4 space-y-2">
+  <label class="block text-sm text-gray-700">Cambiar estado</label>
+  <select name="nuevo_estado" class="border rounded px-3 py-2 w-full">
+    <!-- TODO: poblar desde tus transiciones permitidas -->
+    <option value="retirado_bodega">Retirado de bodega</option>
+    <option value="en_transito">En tránsito</option>
+    <option value="en_reparto">En reparto</option>
+    <option value="entregado">Entregado</option>
+    <option value="fallido">Fallido</option>
+    <option value="devuelto">Devuelto</option>
+  </select>
+  <button class="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Actualizar estado</button>
+</form>
+
+<form method="post" action="/carrier/envios/{{ envio.id }}/pod" enctype="multipart/form-data" class="mt-4 bg-white border rounded-lg p-4 space-y-2">
+  <label class="block text-sm text-gray-700">Subir evidencia (POD)</label>
+  <input type="file" name="evidencia" accept="image/*" capture="environment" class="block">
+  <button class="mt-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Subir</button>
+</form>
+{% endblock %}

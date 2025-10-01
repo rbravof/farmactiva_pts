@@ -7,13 +7,13 @@ from sqlalchemy.orm import Session
 import csv, io, re, math, os, unicodedata, time
 from typing import List, Optional, Literal
 from app.database import get_db
-from app.routers.admin_security import require_admin
+from app.routers.admin_security import require_admin, require_staff
 from app.utils.view import render_admin
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 router = APIRouter(
     tags=["Admin Productos"],
-    dependencies=[Depends(require_admin)]
+    dependencies=[Depends(require_staff)]
 )
 templates = Jinja2Templates(directory="app/templates")
 
@@ -1127,3 +1127,109 @@ def admin_precio_usar_lista(
     resp = RedirectResponse(url=redirect, status_code=303)
     resp.set_cookie("lista_precio_activa", slug, max_age=60*60*6, httponly=True, samesite="lax")
     return resp
+
+# ============================
+# Productos: búsqueda y precio
+# ============================
+
+@router.get("/admin/productos/buscar")
+def admin_productos_buscar(
+    q: str,
+    id_lista: int | None = None,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    admin_user: dict = Depends(require_staff),
+):
+    q = (q or "").strip()
+    if len(q) < 2:
+        return []
+
+    params = {
+        "q_name": f"%{q.lower()}%",
+        "q_ean":  f"%{q}%",
+        "limit":  max(1, min(limit, 50)),
+    }
+    id_lista_filter = ""
+    if id_lista is not None:
+        id_lista_filter = "AND pr.id_lista = :id_lista"
+        params["id_lista"] = id_lista
+
+    sql = f"""
+        SELECT
+          p.id_producto                   AS id,
+          p.titulo                        AS nombre,
+          p.slug                          AS slug,
+          p.imagen_principal_url          AS imagen,
+          (
+            SELECT cb.codigo_barra
+            FROM public.codigos_barras cb
+            WHERE cb.id_producto = p.id_producto AND cb.es_principal = TRUE
+            LIMIT 1
+          ) AS ean,
+          prx.precio_sugerido
+        FROM public.productos p
+        LEFT JOIN LATERAL (
+          SELECT CAST(ROUND(pr.precio_bruto) AS INTEGER) AS precio_sugerido
+          FROM public.precios pr
+          WHERE pr.id_producto = p.id_producto
+            {id_lista_filter}
+            AND (pr.vigente_hasta IS NULL OR pr.vigente_hasta >= now())
+          ORDER BY pr.vigente_desde DESC, pr.id_precio DESC
+          LIMIT 1
+        ) prx ON TRUE
+        WHERE
+              LOWER(p.titulo) LIKE :q_name
+          OR  LOWER(p.slug)   LIKE :q_name
+          OR  EXISTS (
+                SELECT 1
+                FROM public.codigos_barras cb2
+                WHERE cb2.id_producto = p.id_producto
+                  AND cb2.codigo_barra ILIKE :q_ean
+              )
+        ORDER BY LOWER(p.titulo) ASC
+        LIMIT :limit
+    """
+
+    rows = db.execute(text(sql), params).mappings().all()
+    items = [{
+        "id": r["id"],
+        "nombre": r["nombre"],
+        "slug": r["slug"],
+        "imagen": r["imagen"],
+        "ean": r["ean"],
+        "precio_sugerido": int(r["precio_sugerido"]) if r["precio_sugerido"] is not None else 0,
+    } for r in rows]
+
+    print(f"[BUSCAR productos] q='{q}' -> {len(items)} coincidencias")
+    return items
+
+
+@router.get("/admin/productos/precio")
+def admin_productos_precio(
+    id_producto: int,
+    id_lista: int | None = None,
+    db: Session = Depends(get_db),
+    admin_user: dict = Depends(require_staff),
+):
+    try:
+        params = {"id": id_producto}
+        id_lista_filter = ""
+        if id_lista is not None:
+            id_lista_filter = "AND pr.id_lista = :id_lista"
+            params["id_lista"] = id_lista
+
+        sql = f"""
+            SELECT CAST(ROUND(pr.precio_bruto) AS INTEGER) AS precio
+            FROM public.precios pr
+            WHERE pr.id_producto = :id
+              {id_lista_filter}
+              AND (pr.vigente_hasta IS NULL OR pr.vigente_hasta >= now())
+            ORDER BY pr.vigente_desde DESC, pr.id_precio DESC
+            LIMIT 1
+        """
+
+        precio = db.execute(text(sql), params).scalar()
+        return JSONResponse({"ok": True, "precio": int(precio or 0)})
+    except Exception as e:
+        print("[/admin/productos/precio] error:", e)
+        return JSONResponse({"ok": False, "precio": 0})

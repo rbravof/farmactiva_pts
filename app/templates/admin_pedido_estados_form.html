@@ -1,0 +1,58 @@
+{% extends "base_admin.html" %}
+{% block title %}{{ 'Nuevo' if mode=='create' else 'Editar' }} estado | Admin{% endblock %}
+
+{% block content %}
+<div class="bg-white border rounded-xl shadow p-5 max-w-2xl">
+  <h1 class="text-xl font-semibold mb-4">
+    {{ 'Nuevo estado' if mode=='create' else 'Editar estado' }}
+  </h1>
+
+  {% if error %}
+    <div class="mb-4 px-3 py-2 rounded bg-red-50 text-red-700 text-sm">
+      {{ error }}
+    </div>
+  {% endif %}
+
+  <form method="post" action="{{ '/admin/config/estados-pedido/guardar' if mode=='create' else '/admin/config/estados-pedido/' ~ estado.id_estado ~ '/actualizar' }}">
+    <div class="grid grid-cols-1 gap-4">
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">Código</label>
+        <input name="codigo" value="{{ estado.codigo if estado else '' }}" required maxlength="40"
+               class="w-full border rounded px-3 py-2 focus:ring" />
+        <p class="text-xs text-gray-500 mt-1">Único, ej: <code>CREADO</code>, <code>APROBADO</code>.</p>
+      </div>
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">Nombre</label>
+        <input name="nombre" value="{{ estado.nombre if estado else '' }}" required maxlength="80"
+               class="w-full border rounded px-3 py-2 focus:ring" />
+      </div>
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">Rol responsable</label>
+        <input name="rol_responsable" value="{{ estado.rol_responsable if estado else '' }}" required maxlength="30"
+               class="w-full border rounded px-3 py-2 focus:ring" />
+        <p class="text-xs text-gray-500 mt-1">Ej: <code>ventas</code>, <code>pagos</code>, <code>despacho</code>.</p>
+      </div>
+      <div class="grid grid-cols-3 gap-4">
+        <div>
+          <label class="block text-sm text-gray-600 mb-1">Orden</label>
+          <input type="number" name="orden" value="{{ estado.orden if estado else 0 }}"
+                 class="w-full border rounded px-3 py-2 focus:ring" />
+        </div>
+        <label class="inline-flex items-center mt-6">
+          <input type="checkbox" name="activo" {% if not estado or estado.activo %}checked{% endif %} class="mr-2">
+          Activo
+        </label>
+        <label class="inline-flex items-center mt-6">
+          <input type="checkbox" name="es_final" {% if estado and estado.es_final %}checked{% endif %} class="mr-2">
+          Estado final
+        </label>
+      </div>
+    </div>
+
+    <div class="mt-6 flex items-center gap-2">
+      <button class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Guardar</button>
+      <a href="/admin/config/estados-pedido/" class="px-4 py-2 border rounded hover:bg-gray-50">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

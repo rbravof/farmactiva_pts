@@ -1,0 +1,28 @@
+{% extends "base_admin.html" %}
+{% block title %}Envío #{{ envio.id_envio }} | Admin{% endblock %}
+{% block content %}
+<div class="bg-white border rounded-xl shadow p-5">
+  <h1 class="text-xl font-semibold mb-4">Envío #{{ envio.id_envio }} · Pedido #{{ envio.id_pedido }}</h1>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+    <div><div class="text-xs text-gray-500">Estado</div><div class="font-medium">{{ envio.estado }}</div></div>
+    <div><div class="text-xs text-gray-500">Transportista</div><div class="font-medium">{{ envio.transportista.nombre if envio.transportista else '—' }}</div></div>
+    <div><div class="text-xs text-gray-500">Tracking</div><div class="font-mono text-xs">{{ envio.tracking_token }}</div></div>
+    <div><div class="text-xs text-gray-500">Creado</div><div class="font-medium">{{ envio.creado_en }}</div></div>
+  </div>
+
+  <h2 class="text-sm font-semibold mb-2">Eventos</h2>
+  <ol class="space-y-2">
+    {% for ev in envio.eventos %}
+      <li class="text-sm border rounded px-3 py-2">
+        <div class="font-medium">{{ ev.estado }}</div>
+        <div class="text-xs text-gray-500">{{ ev.creado_en }} · {{ ev.actor or '—' }}</div>
+        {% if ev.nota %}<div class="text-sm mt-1">{{ ev.nota }}</div>{% endif %}
+        {% if ev.evidencia_url %}<div class="mt-1 text-xs text-blue-700"><a href="{{ ev.evidencia_url }}" target="_blank">Ver evidencia</a></div>{% endif %}
+      </li>
+    {% else %}
+      <li class="text-sm text-gray-500">Sin eventos.</li>
+    {% endfor %}
+  </ol>
+</div>
+{% endblock %}

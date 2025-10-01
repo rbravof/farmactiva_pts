@@ -1,0 +1,272 @@
+{% extends "base_carrier.html" %}
+{% block title %}Entrega #{{ header.numero }}{% endblock %}
+{% block content %}
+<main class="page">
+  <div class="wrap">
+    <h1 class="text-xl font-semibold mb-3">Entrega #{{ header.numero }}</h1>
+
+    {# --------- Ficha del cliente (sin dirección) --------- #}
+    <section class="p-4 rounded-2xl border mb-4">
+      <div class="font-medium">{{ header.cliente_nombre }}</div>
+      {% set tel = header.telefono or header.telefono1 or header.fono or header.fono1 or header.celular or header.movil or header.cliente_fono or header.cliente_telefono %}
+      {% set mail = header.email or header.correo or header.cliente_email %}
+      <div class="mt-1 text-sm text-gray-700 space-y-1">
+        <div>
+          Teléfono:
+          {% if tel %}
+            <a class="text-blue-600 hover:underline"
+               href="tel:{{ tel|replace(' ', '')|replace('(', '')|replace(')', '')|replace('-', '') }}">{{ tel }}</a>
+          {% else %}
+            <span class="text-gray-500">Sin teléfono</span>
+          {% endif %}
+        </div>
+        <div>
+          Correo:
+          {% if mail %}
+            <a class="text-blue-600 hover:underline" href="mailto:{{ mail }}">{{ mail }}</a>
+          {% else %}
+            <span class="text-gray-500">Sin correo</span>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
+    {# --------- Dirección para mapa (dos líneas) --------- #}
+    {% set _comuna = header.comuna or header.comuna_nombre or header.comuna_name or header.cliente_comuna %}
+    {% set _region = header.region or header.region_nombre or header.region_name or header.cliente_region %}
+    {% set dir_linea1 = ([header.calle, header.calle_numero]|select|list)|join(' ') %}
+    {% set comuna_region = ([_comuna, _region]|select|list)|join(', ') %}
+
+    {# Juntamos depto + referencia (+ complemento) si vienen #}
+    {% set dir_complemento = ([header.depto, header.referencia, header.complemento]|select|list)|join(' — ') %}
+
+    <section class="p-4 rounded-2xl border mb-4">
+      <h3 class="font-medium mb-2">Mapa</h3>
+
+      <div class="text-sm text-gray-800 mb-1">
+        {{ dir_linea1 }}{% if comuna_region %}, {{ comuna_region }}{% endif %}
+      </div>
+
+      {% if dir_complemento %}
+        <div class="text-xs text-gray-600 mb-2">{{ dir_complemento }}</div>
+      {% endif %}
+
+      <div id="mapContainer" class="rounded-2xl overflow-hidden border">
+        <div id="map"
+            data-street="{{ dir_linea1 }}"
+            data-city="{{ _comuna or '' }}"
+            data-state="{{ _region or '' }}"
+            class="w-full h-64 md:h-80"></div>
+      </div>
+
+      <div class="mt-2">
+        <a id="gmapsLink" class="text-blue-600 hover:underline" href="#"
+          target="_blank" rel="noopener">Abrir en Google Maps</a>
+      </div>
+    </section>
+
+    <!-- Acciones según estado -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+      {% if header.estado_codigo == 'LISTO_RETIRO' %}
+        <form method="post" action="/carrier/pedidos/{{ header.id_pedido }}/marcar-retirado">
+          <button class="w-full p-3 rounded-xl border">Marcar retirado</button>
+        </form>
+      {% endif %}
+      {% if header.estado_codigo == 'RETIRADO' %}
+        <form method="post" action="/carrier/pedidos/{{ header.id_pedido }}/marcar-en-transito">
+          <button class="w-full p-3 rounded-xl border">En tránsito</button>
+        </form>
+      {% endif %}
+      {% if header.estado_codigo == 'EN_TRANSITO' %}
+        <form method="post" action="/carrier/pedidos/{{ header.id_pedido }}/marcar-entregado" class="sm:col-span-2">
+          <input name="receptor_nombre" class="w-full mb-2 p-2 rounded border" placeholder="Nombre receptor (opcional)">
+          <button class="w-full p-3 rounded-xl border">Entregado</button>
+        </form>
+      {% endif %}
+      {% if header.estado_codigo not in ['LISTO_RETIRO','RETIRADO','EN_TRANSITO'] %}
+        <div class="text-sm text-gray-500">No hay acciones disponibles para el estado actual.</div>
+      {% endif %}
+    </section>
+
+    <!-- GPS -->
+    <section class="p-4 rounded-2xl border mb-4">
+      <h3 class="font-medium mb-2">GPS</h3>
+      <div class="flex gap-2">
+        <button id="btnPing" class="px-3 py-2 rounded-xl border hover:bg-gray-50">Enviar ubicación</button>
+        <span id="gpsMsg" class="text-sm text-gray-600"></span>
+      </div>
+    </section>
+
+    <!-- Temperatura -->
+    <section class="p-4 rounded-2xl border mb-4">
+      <h3 class="font-medium mb-2">Temperatura</h3>
+      <form id="frmTemp" method="post" action="/carrier/temperatura/registrar" class="flex gap-2 items-center">
+        <input type="hidden" name="id_pedido" value="{{ header.id_pedido }}">
+        <input name="celsius" type="number" step="0.01" class="p-2 rounded border w-32" placeholder="°C">
+        <input name="sensor_id" class="p-2 rounded border" placeholder="Sensor (opcional)">
+        <button class="px-3 py-2 rounded-xl border hover:bg-gray-50">Registrar</button>
+      </form>
+    </section>
+
+    <!-- Incidencia -->
+    <section class="p-4 rounded-2xl border mb-4">
+      <h3 class="font-medium mb-2">Reportar incidencia</h3>
+      <form method="post" action="/carrier/pedidos/{{ header.id_pedido }}/incidencia" enctype="multipart/form-data" class="space-y-2">
+        <select name="tipo" class="w-full p-2 rounded border" required>
+          <option value="NO_UBICABLE">No ubicable</option>
+          <option value="RECHAZO">Rechazo cliente</option>
+          <option value="DAÑO">Producto dañado</option>
+          <option value="ROBO">Robo</option>
+          <option value="OTRO">Otro</option>
+        </select>
+        <textarea name="descripcion" class="w-full p-2 rounded border" rows="3" placeholder="Descripción"></textarea>
+        <input type="file" name="foto" accept="image/*" class="w-full p-2 rounded border">
+        <button class="px-3 py-2 rounded-xl border hover:bg-gray-50">Enviar incidencia</button>
+      </form>
+    </section>
+
+    <!-- Firma -->
+    <section class="p-4 rounded-2xl border mb-4">
+      <h3 class="font-medium mb-2">Firma del receptor</h3>
+      <canvas id="signPad" class="w-full bg-white border rounded" height="180"></canvas>
+      <div class="flex gap-2 mt-2">
+        <button id="btnClear" class="px-3 py-2 border rounded-xl">Limpiar</button>
+        <form id="frmFirma" method="post" action="/carrier/pedidos/{{ header.id_pedido }}/firmar" class="flex gap-2 items-center">
+          <input name="receptor_nombre" class="p-2 rounded border" placeholder="Nombre receptor">
+          <input type="hidden" name="firma_b64" id="firma_b64">
+          <button id="btnSave" class="px-3 py-2 rounded-xl border hover:bg-gray-50">Guardar firma</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Timeline eventos -->
+    <section class="p-4 rounded-2xl border">
+      <h3 class="font-medium mb-2">Eventos</h3>
+      <ul class="space-y-1 text-sm">
+        {% for ev in eventos %}
+          <li>• <span class="font-semibold">{{ ev.estado }}</span> — {{ ev.nota or '' }} <span class="text-gray-500">({{ ev.creado_en }}, {{ ev.actor }} {{ ev.actor_usuario or '' }})</span></li>
+        {% else %}
+          <li class="text-gray-500">Sin eventos</li>
+        {% endfor %}
+      </ul>
+    </section>
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // ----- Mapa con geocodificación estructurada (Nominatim) -----
+  (function () {
+    const el = document.getElementById('map');
+    if (!el) return;
+
+    const street = (el.dataset.street || '').trim(); // Av. Vicuña Mackenna 680
+    const city   = (el.dataset.city   || '').trim(); // Comuna
+    const state  = (el.dataset.state  || '').trim(); // Región
+
+    // Link a Google Maps con texto completo
+    const gmFull = [street, city, state, 'Chile'].filter(Boolean).join(', ');
+    const gmaps = document.getElementById('gmapsLink');
+    if (gmaps) gmaps.href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(gmFull);
+
+    let url;
+    if (city || state) {
+      const params = new URLSearchParams({
+        format: 'json',
+        limit: '1',
+        addressdetails: '1',
+        countrycodes: 'cl',
+        street: street,
+        city: city,
+        state: state
+      });
+      url = 'https://nominatim.openstreetmap.org/search?' + params.toString();
+    } else {
+      // Fallback a búsqueda simple si falta comuna/región
+      const q = [street, 'Chile'].filter(Boolean).join(', ');
+      url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&countrycodes=cl&q=' + encodeURIComponent(q);
+    }
+
+    fetch(url, { headers: { 'Accept': 'application/json' } })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(json => {
+        if (!json || !json[0]) throw new Error('No se encontró coordenada');
+        const lat = parseFloat(json[0].lat), lon = parseFloat(json[0].lon);
+        initMap([lat, lon], gmFull);
+      })
+      .catch(err => {
+        console.warn('[MAP] geocoding fallo:', err, {street, city, state});
+        initMap([-33.4489, -70.6693], gmFull, false); // Fallback Santiago
+      });
+
+    function initMap(center, popupText, addMarker = true) {
+      const map = L.map('map', { scrollWheelZoom: false }).setView(center, 16);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap'
+      }).addTo(map);
+      if (addMarker) L.marker(center).addTo(map).bindPopup(popupText).openPopup();
+    }
+  })();
+
+  // ----- GPS ping (HTML5) -----
+  const btnPing = document.getElementById('btnPing');
+  const gpsMsg = document.getElementById('gpsMsg');
+  if (btnPing) {
+    btnPing.onclick = () => {
+      if (!navigator.geolocation) { gpsMsg.textContent = "Geolocalización no soportada"; return; }
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const body = new URLSearchParams();
+        body.append('lat', pos.coords.latitude);
+        body.append('lon', pos.coords.longitude);
+        body.append('acc_m', pos.coords.accuracy || 0);
+        body.append('id_pedido', '{{ header.id_pedido }}');
+        const res = await fetch('/carrier/gps/ping', { method:'POST', body });
+        const j = await res.json();
+        gpsMsg.textContent = j.ok ? "✅ Ubicación enviada" : "💥 Error";
+      }, (err) => { gpsMsg.textContent = "💥 " + err.message; }, { enableHighAccuracy: true, timeout: 8000 });
+    };
+  }
+
+  // ----- Firma en canvas -----
+  const canvas = document.getElementById('signPad');
+  const btnClear = document.getElementById('btnClear');
+  const btnSave  = document.getElementById('btnSave');
+  const hidden   = document.getElementById('firma_b64');
+
+  if (canvas) {
+    const ctx = canvas.getContext('2d');
+    let drawing = false, prev = null;
+
+    const getPos = (e) => {
+      if (e.touches && e.touches.length) {
+        const rect = canvas.getBoundingClientRect();
+        return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+      } else {
+        return { x: e.offsetX, y: e.offsetY };
+      }
+    };
+
+    const drawTo = (p) => {
+      if (!prev) prev = p;
+      ctx.beginPath(); ctx.moveTo(prev.x, prev.y); ctx.lineTo(p.x, p.y); ctx.lineWidth = 2; ctx.stroke(); prev = p;
+    };
+
+    canvas.addEventListener('mousedown', (e) => { drawing = true; prev = getPos(e); });
+    canvas.addEventListener('mousemove', (e) => { if (drawing) drawTo(getPos(e)); });
+    canvas.addEventListener('mouseup', () => { drawing = false; prev = null; });
+    canvas.addEventListener('touchstart', (e) => { drawing = true; prev = getPos(e); });
+    canvas.addEventListener('touchmove', (e) => { if (drawing) { drawTo(getPos(e)); e.preventDefault(); } }, { passive:false });
+    canvas.addEventListener('touchend', () => { drawing = false; prev = null; });
+
+    if (btnClear) btnClear.onclick = () => { ctx.clearRect(0,0,canvas.width,canvas.height); };
+
+    if (btnSave) btnSave.onclick = (e) => {
+      e.preventDefault();
+      hidden.value = canvas.toDataURL('image/png');
+      document.getElementById('frmFirma').submit();
+    };
+  }
+</script>
+{% endblock %}

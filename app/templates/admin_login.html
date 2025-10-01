@@ -16,7 +16,7 @@
   </header>
 
   <main class="max-w-sm mx-auto px-4 py-12">
-    <h1 class="text-2xl font-semibold mb-6">Panel de Administración</h1>
+    <h1 class="text-2xl font-semibold mb-6">{{ login_title or 'Panel de Administración' }}</h1>
 
     {% if error %}
       <div class="mb-4 p-3 rounded bg-red-50 text-red-700 border border-red-200">
@@ -24,17 +24,17 @@
       </div>
     {% endif %}
 
-    <form method="post" action="/admin/login" class="bg-white rounded-xl shadow p-5 space-y-4">
+    <form method="post" action="{{ action or '/admin/login' }}" class="bg-white rounded-xl shadow p-5 space-y-4">
       <div>
         <label for="usuario" class="block text-sm mb-1">Usuario</label>
         <input id="usuario" name="usuario" type="text" required placeholder="admin"
-               class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500"/>
+              class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500"/>
       </div>
 
       <div>
         <label for="password" class="block text-sm mb-1">Clave</label>
         <input id="password" name="password" type="password" required placeholder="********"
-               class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500"/>
+              class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500"/>
       </div>
 
       <button type="submit"
@@ -42,7 +42,19 @@
         Entrar
       </button>
 
-      <p class="text-xs text-gray-500 mt-2">Acceso exclusivo para administradores.</p>
+      <p class="text-xs text-gray-500 mt-2">
+        {{ login_note or 'Acceso exclusivo para administradores.' }}
+      </p>
+
+      <div class="text-xs text-gray-500 mt-2">
+        {% if action == '/admin/login' %}
+          ¿Eres transportista?
+          <a href="/carrier/login" class="text-blue-600 hover:underline">Ir al portal de transportistas</a>
+        {% else %}
+          ¿Eres administrador?
+          <a href="/admin/login" class="text-blue-600 hover:underline">Ir al panel de administración</a>
+        {% endif %}
+      </div>
     </form>
   </main>
 

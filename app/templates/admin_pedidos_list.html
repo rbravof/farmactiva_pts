@@ -10,7 +10,6 @@
     </div>
   </div>
 
-  {# --- Flash de éxito (cuando ?ok=created&n=PED-...) --- #}
   {% if flash_success %}
     <div class="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-green-700">
       {{ flash_success }}
@@ -49,7 +48,6 @@
           <th class="px-3 py-2 text-left">Cliente</th>
           <th class="px-3 py-2 text-left">Estado</th>
           <th class="px-3 py-2 text-right w-36">Total</th>
-          <th class="px-3 py-2 text-left">Última nota</th>
           <th class="px-3 py-2 text-center">Canal</th>
           <th class="px-3 py-2"></th>
         </tr>
@@ -60,9 +58,15 @@
           <td class="px-3 py-2 font-medium">
             <a href="/admin/pedidos/{{ r.id_pedido }}" class="hover:underline">{{ r.numero }}</a>
           </td>
-          <td class="px-3 py-2 text-slate-600">
+          <td class="px-3 py-2 text-slate-600 whitespace-nowrap">
             {% if r.creado_en %}
-              {{ r.creado_en.strftime('%Y-%m-%d %H:%M') if r.creado_en.__class__.__name__ != 'str' else r.creado_en }}
+              {% set _dt = r.creado_en %}
+              {% if _dt.__class__.__name__ != 'str' %}
+                {{ _dt.strftime('%d-%m-%Y') }}
+              {% else %}
+                {% set y = _dt[0:4] %}{% set m = _dt[5:7] %}{% set d = _dt[8:10] %}
+                {{ d }}-{{ m }}-{{ y }}
+              {% endif %}
             {% else %}—{% endif %}
           </td>
           <td class="px-3 py-2">{{ r.cliente_nombre if r.cliente_nombre is defined else '—' }}</td>
@@ -72,18 +76,6 @@
           </td>
           <td class="px-3 py-2 text-right whitespace-nowrap">
             <span data-money="{{ r.total_neto or 0 }}"></span>
-          </td>
-          <td class="px-3 py-2 text-slate-600">
-            {% if r.ultima_nota %}
-              <span class="inline-flex items-center gap-2">
-                <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                  {% if r.ultima_audiencia == 'NEXT_ROLE' %}→ {{ r.ultima_nota_para or 'Rol' }}
-                  {% elif r.ultima_audiencia == 'CUSTOMER' %}Cliente
-                  {% else %}Interno{% endif %}
-                </span>
-                <span class="line-clamp-1">{{ r.ultima_nota }}</span>
-              </span>
-            {% else %}—{% endif %}
           </td>
           <td class="px-3 py-2 text-center">
             <span class="text-xs px-2 py-0.5 rounded-full {{ 'bg-amber-100 text-amber-700' if r.canal=='manual' else 'bg-indigo-100 text-indigo-700' }}">
@@ -95,11 +87,12 @@
           </td>
         </tr>
         {% else %}
-        <tr><td class="px-3 py-4 text-gray-500" colspan="8">No hay pedidos.</td></tr>
+        <tr><td class="px-3 py-4 text-gray-500" colspan="7">No hay pedidos.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+
 </div>
 
 <!-- Modal Cambiar Estado -->
@@ -275,17 +268,6 @@
       const badge = tr.querySelector('[data-badge-estado]');
       badge.textContent = data.estado_actual.nombre;
       badge.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ' + badgeByEstado(data.estado_actual.codigo);
-
-      if (data.ultima_nota) {
-        tr.querySelector('td:nth-child(6)').innerHTML =
-          `<span class="inline-flex items-center gap-2">
-             <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-               ${data.ultima_nota.audiencia==='NEXT_ROLE' ? '→ '+(data.ultima_nota.destinatario_rol||'Rol') :
-                 data.ultima_nota.audiencia==='CUSTOMER' ? 'Cliente' : 'Interno'}
-             </span>
-             <span class="line-clamp-1">${data.ultima_nota.texto}</span>
-           </span>`;
-      }
 
       closeAll();
     } catch (e) {

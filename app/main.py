@@ -3,7 +3,6 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from starlette.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 # Routers existentes
@@ -11,17 +10,21 @@ from app.routers import security, admin_productos, admin_catalogo
 from app.routers import auth
 from app.routers import catalogo
 from app.routers import beneficios
+from app.routers import admin_pedido_estados
 from app.routers import pedidos
 from app.routers import admin_security  # panel admin (/admin)
 from app.routers import admin_pedidos
 from app.routers import admin_clientes
-from app.routers import admin_envios
+from app.routers import admin_envios, admin_api
 from app.routers import admin_bodegas
 from app.routers import admin_precios
 from app.routers import admin_menu
 from app.routers import admin_pagos
 from app.routers import public_pagos
 from app.routers import db_tools
+from app.routers import admin_usuarios
+from app.routers.carrier import router as carrier_router
+from app.routers import admin_transportistas, admin_transporte
 
 app = FastAPI(
     title="Farmactiva · Por tu Salud",
@@ -53,6 +56,7 @@ app.include_router(pedidos.router,    prefix="/api/pedidos",   tags=["Pedidos"])
 app.include_router(admin_security.router)             # /admin, /admin/login, /admin/logout
 app.include_router(admin_productos.router)
 app.include_router(admin_catalogo.router)
+app.include_router(admin_pedido_estados.router)
 app.include_router(admin_pedidos.router)
 app.include_router(admin_clientes.router)
 app.include_router(admin_bodegas.router)
@@ -63,6 +67,11 @@ app.include_router(admin_menu.router)
 app.include_router(admin_pagos.router)
 app.include_router(public_pagos.router)
 app.include_router(db_tools.router)
+app.include_router(admin_usuarios.router)
+app.include_router(admin_transportistas.router)
+app.include_router(admin_transporte.router)
+app.include_router(carrier_router)
+app.include_router(admin_api.api) 
 
 # ===========================
 # Rutas públicas básicas

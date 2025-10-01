@@ -1,0 +1,48 @@
+{% extends "base_admin.html" %}
+{% block title %}Envíos | Admin{% endblock %}
+{% block content %}
+<div class="bg-white border rounded-xl shadow p-5">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-xl font-semibold">Envíos</h1>
+  </div>
+
+  <table class="min-w-full text-sm">
+    <thead>
+      <tr class="text-left text-gray-500 border-b">
+        <th class="py-2 pr-4">ID</th>
+        <th class="py-2 pr-4">Pedido</th>
+        <th class="py-2 pr-4">Estado</th>
+        <th class="py-2 pr-4">Transportista</th>
+        <th class="py-2 pr-4">Creado</th>
+        <th class="py-2 pr-4 text-right">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in envios %}
+      <tr class="border-b hover:bg-gray-50">
+        <td class="py-2 pr-4">{{ e.id_envio }}</td>
+        <td class="py-2 pr-4">#{{ e.id_pedido }}</td>
+        <td class="py-2 pr-4">{{ e.estado }}</td>
+        <td class="py-2 pr-4">{{ e.transportista.nombre if e.transportista else '—' }}</td>
+        <td class="py-2 pr-4">{{ e.creado_en }}</td>
+        <td class="py-2 pr-4 text-right">
+          <a href="/admin/envios/{{ e.id_envio }}" class="px-2 py-1 text-xs border rounded">Ver</a>
+          <form method="post" action="/admin/envios/{{ e.id_envio }}/asignar" class="inline-flex items-center gap-2">
+            <select name="id_transportista" class="border rounded px-2 py-1 text-xs">
+              {% for t in transportistas %}
+                <option value="{{ t.id_transportista }}" {{ 'selected' if e.transportista and e.transportista.id_transportista==t.id_transportista }}>
+                  {{ t.nombre }}
+                </option>
+              {% endfor %}
+            </select>
+            <button class="px-2 py-1 text-xs border rounded bg-gray-50">Asignar</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="py-6 text-center text-gray-500">Sin envíos.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

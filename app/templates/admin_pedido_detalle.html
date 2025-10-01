@@ -45,13 +45,14 @@
                      {{ 'bg-emerald-50 text-emerald-700 border border-emerald-200' if pago_ok else 'bg-amber-50 text-amber-700 border border-amber-200' }}">
           {{ 'Pagado' if pago_ok else 'No pagado' }}
         </span>
-        {% set estado = (header.get('estado_codigo') or 'NUEVO') %}
+        {% set estado_code = (header.get('estado_codigo') or 'NUEVO') %}
+        {% set estado_name = (header.get('estado_nombre') or estado_code.replace('_',' ')|title) %}
         <span id="badge-estado"
-              data-estado="{{ estado }}"
+              data-estado="{{ estado_code }}"
               class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
                     border bg-green-50 text-green-700 border-green-200"
               style="background-color:#ECFDF5; color:#166534; border-color:#BBF7D0;">
-          {{ estado.replace('_',' ')|title }}
+          {{ estado_name }}
         </span>
       </div>
     </div>
@@ -61,17 +62,23 @@
       <button class="px-3 py-2 border rounded-lg text-slate-700 cursor-not-allowed opacity-60" disabled>Editar</button>
 
       <!-- Menú: Más acciones -->
-      <div class="relative" id="actions-dropdown">
-        <button id="btn-more-actions"
+      <div class="relative overflow-visible" id="actions-dropdown">
+        <button type="button" id="btn-more-actions" aria-expanded="false"
                 class="px-3 py-2 rounded-lg border bg-white hover:bg-slate-50 text-slate-800">
           Más acciones ▾
         </button>
         <div id="menu-more-actions"
-             class="hidden absolute right-0 mt-2 w-56 bg-white border rounded-xl shadow-lg z-20">
+            class="hidden absolute right-0 mt-2 w-56 bg-white border rounded-xl shadow-lg z-50">
           <button type="button" id="act-imprimir"
                   class="w-full text-left px-3 py-2 hover:bg-slate-50">Imprimir Etiqueta</button>
           <button type="button" id="act-estado"
                   class="w-full text-left px-3 py-2 hover:bg-slate-50">Cambiar Estado</button>
+          <!-- Botón en la barra de acciones del detalle -->
+          <button type="button"
+                  class="btn btn-mint px-3 py-2 rounded-xl"
+                  onclick="document.getElementById('modalAsignarTransportista').showModal()">
+            🚚 Asignar transportista
+          </button>
         </div>
       </div>
     </div>
@@ -238,6 +245,30 @@
         </div>
       </section>
 
+      <section class="mt-6 p-4 border rounded-2xl">
+        <h4 class="font-medium mb-2">Envío</h4>
+        {% if carrier.transportista_nombre %}
+          <p><strong>Transportista:</strong> {{ carrier.transportista_nombre }}</p>
+          {% if carrier.tracking_ext %}
+            <p><strong>Tracking:</strong> <a class="text-blue-600 underline" href="{{ carrier.tracking_ext }}" target="_blank">{{ carrier.tracking_ext }}</a></p>
+          {% endif %}
+          <p><strong>Estado logístico:</strong> {{ carrier.estado_logistico }}</p>
+        {% else %}
+          <p class="text-gray-500">No asignado</p>
+        {% endif %}
+
+        <div class="mt-4">
+          <h5 class="font-medium mb-1">Traza logística</h5>
+          <ul class="space-y-1 text-sm">
+            {% for ev in eventos_envio %}
+              <li>• <span class="font-semibold">{{ ev.estado }}</span> — {{ ev.nota or '' }} <span class="text-gray-500">({{ ev.creado_en }}, {{ ev.actor }} {{ ev.actor_usuario or '' }})</span></li>
+            {% else %}
+              <li class="text-gray-500">Sin eventos</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </section>
+
       <!-- Cronología (placeholder) -->
       <section class="bg-white border rounded-xl">
         <div class="px-5 py-3 border-b">
@@ -360,13 +391,16 @@
               <span>Visible al cliente</span>
             </label>
 
-            <select name="destinatario_rol" class="ml-auto border rounded-lg px-2 py-1">
-              <option value="">— Destinatario (opcional) —</option>
-              <option value="bodega">Bodega</option>
-              <option value="ventas">Ventas</option>
-              <option value="reparto">Reparto</option>
-              <option value="cliente">Cliente</option>
+            <select name="destinatario_rol" id="sel-destinatario"
+                    class="w-full border rounded-lg px-3 py-2">
+              <option value="">— Selecciona rol (opcional) —</option>
+              {% for r in roles_combo %}
+                <option value="{{ r.code }}" {{ 'selected' if default_dest == r.code else '' }}>
+                  {{ r.name }}
+                </option>
+              {% endfor %}
             </select>
+
           </div>
 
           <div class="flex items-center justify-end">
@@ -449,7 +483,9 @@
               <label class="block text-sm text-slate-700 mb-1">Nuevo estado</label>
               <select name="nuevo_estado" class="w-full border rounded-lg px-3 py-2">
                 {% for e in estados %}
-                  <option value="{{ e.codigo }}">{{ e.nombre or e.codigo }}</option>
+                  <option value="{{ e.codigo }}" {{ 'selected' if loop.first else '' }}>
+                    {{ e.nombre or (e.codigo | replace('_',' ') | title) }}
+                  </option>
                 {% endfor %}
               </select>
             {% else %}
@@ -643,21 +679,54 @@
   </div>
 </div>
 
+<!-- Modal Asignar transportista -->
+<dialog id="modalAsignarTransportista" class="modal">
+  <form method="post" action="/admin/pedidos/{{ header.id_pedido }}/asignar-transportista"
+        class="modal-box space-y-4">
+    <h3 class="font-semibold text-lg">Asignar transportista</h3>
+
+    <label class="block text-sm">Transportista</label>
+    <select name="id_transportista" class="w-full border rounded-xl p-2" required>
+      {% for t in transportistas_activos %}
+        <option value="{{ t.id_transportista }}">{{ t.nombre }} — {{ t.rut }}</option>
+      {% endfor %}
+    </select>
+
+    <label class="block text-sm mt-2">Tracking externo (opcional)</label>
+    <input type="text" name="tracking_ext" class="w-full border rounded-xl p-2" placeholder="Código/URL de seguimiento">
+
+    <label class="block text-sm mt-2">Observación (opcional)</label>
+    <textarea name="obs" class="w-full border rounded-xl p-2" rows="3"></textarea>
+
+    <div class="modal-action">
+      <button type="button" class="btn btn-ghost" onclick="this.closest('dialog').close()">Cancelar</button>
+      <button class="btn btn-mint">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
 <script>
-(() => {
+(function () {
   const pedidoId = {{ header.id_pedido|int }};
   const $menuBtn = document.getElementById('btn-more-actions');
   const $menu    = document.getElementById('menu-more-actions');
   const $ddWrap  = document.getElementById('actions-dropdown');
 
-  function toggleMenu(show) { $menu.classList[show ? 'remove' : 'add']('hidden'); }
+  function toggleMenu(show) {
+    if (!$menu) return;
+    if (show) { $menu.classList.remove('hidden'); }
+    else      { $menu.classList.add('hidden'); }
+  }
 
-  $menuBtn?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    toggleMenu($menu.classList.contains('hidden'));
-  });
-  document.addEventListener('click', (e) => {
-    if (!$ddWrap.contains(e.target)) toggleMenu(false);
+  if ($menuBtn) {
+    $menuBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleMenu($menu.classList.contains('hidden'));
+    });
+  }
+  document.addEventListener('click', function (e) {
+    if ($ddWrap && !$ddWrap.contains(e.target)) toggleMenu(false);
   });
 
   // Modales
@@ -667,165 +736,202 @@
     payEmail:  document.getElementById('modal-pay-email'),
     payManual: document.getElementById('modal-pay-manual'),
   };
-  function openModal(name){ console.log('[pedido-actions] open modal:', name); modals[name]?.classList.remove('hidden'); }
-  function closeModal(name){ console.log('[pedido-actions] close modal:', name); modals[name]?.classList.add('hidden'); }
-  document.querySelectorAll('[data-close="label"]').forEach(el => el.addEventListener('click', () => closeModal('label')));
-  document.querySelectorAll('[data-close="estado"]').forEach(el => el.addEventListener('click', () => closeModal('estado')));
-  document.querySelectorAll('[data-close="pay-email"]').forEach(el => el.addEventListener('click', () => closeModal('payEmail')));
-  document.querySelectorAll('[data-close="pay-manual"]').forEach(el => el.addEventListener('click', () => closeModal('payManual')));
+
+  // Diccionario "codigo -> nombre legible"
+  const displayByCode = {
+    {% for e in estados %}
+    "{{ e.codigo|replace('\\','\\\\')|replace('"','\\"') }}": "{{ (e.nombre or (e.codigo|replace('_',' ')|title))|replace('\\','\\\\')|replace('"','\\"') }}"{% if not loop.last %},{% endif %}
+    {% endfor %}
+  };
+
+  // Si el estado actual no viene en "estados", lo añadimos como fallback:
+  {% set cod_actual = header.get('estado_codigo') or 'NUEVO' %}
+  {% set nom_actual = header.get('estado_nombre') or (cod_actual|replace('_',' ')|title) %}
+  if (!displayByCode["{{ cod_actual|replace('\\','\\\\')|replace('"','\\"') }}"]) {
+    displayByCode["{{ cod_actual|replace('\\','\\\\')|replace('"','\\"') }}"] =
+      "{{ nom_actual|replace('\\','\\\\')|replace('"','\\"') }}";
+  }
+
+
+  function openModal(name) {
+    if (modals[name]) { modals[name].classList.remove('hidden'); }
+  }
+  function closeModal(name) {
+    if (modals[name]) { modals[name].classList.add('hidden'); }
+  }
+
+  var closeLabelBtns = document.querySelectorAll('[data-close="label"]');
+  closeLabelBtns.forEach(function (el) { el.addEventListener('click', function () { closeModal('label'); }); });
+
+  var closeEstadoBtns = document.querySelectorAll('[data-close="estado"]');
+  closeEstadoBtns.forEach(function (el) { el.addEventListener('click', function () { closeModal('estado'); }); });
+
+  var closePayEmailBtns = document.querySelectorAll('[data-close="pay-email"]');
+  closePayEmailBtns.forEach(function (el) { el.addEventListener('click', function () { closeModal('payEmail'); }); });
+
+  var closePayManualBtns = document.querySelectorAll('[data-close="pay-manual"]');
+  closePayManualBtns.forEach(function (el) { el.addEventListener('click', function () { closeModal('payManual'); }); });
 
   // Etiqueta
-  document.getElementById('act-imprimir')?.addEventListener('click', () => {
-    toggleMenu(false);
-    const $frame = document.getElementById('label-frame');
-    const url = `/admin/pedidos/${pedidoId}/etiqueta`;
-    console.log('[pedido-actions] abrir etiqueta en modal:', url);
-    $frame.src = url;
-    openModal('label');
-  });
-  document.getElementById('btn-print-label')?.addEventListener('click', () => {
-    console.log('[pedido-actions] print etiqueta (iframe)');
-    const f = document.getElementById('label-frame');
-    try { f.contentWindow.focus(); f.contentWindow.print(); }
-    catch (e) { console.error('[pedido-actions] print error', e); }
-  });
+  var actImprimir = document.getElementById('act-imprimir');
+  if (actImprimir) {
+    actImprimir.addEventListener('click', function () {
+      toggleMenu(false);
+      var frame = document.getElementById('label-frame');
+      var url = "/admin/pedidos/" + pedidoId + "/etiqueta";
+      if (frame) {
+        frame.src = url;
+        openModal('label');
+      }
+    });
+  }
+
+  var btnPrintLabel = document.getElementById('btn-print-label');
+  if (btnPrintLabel) {
+    btnPrintLabel.addEventListener('click', function () {
+      var f = document.getElementById('label-frame');
+      try { if (f && f.contentWindow) { f.contentWindow.focus(); f.contentWindow.print(); } }
+      catch (e) { console.error('[pedido-actions] print error', e); }
+    });
+  }
 
   // ===== Estado: helpers UI =====
   const estadoMap = {
-    'NUEVO': ['bg-green-50','text-green-700','border-green-200'],
-    'APROBADO_QF': ['bg-green-50','text-green-700','border-green-200'],
-    'APROBADO_CRITERIO_QF': ['bg-green-50','text-green-700','border-green-200'],
-    'RECHAZADO_QF': ['bg-rose-50','text-rose-700','border-rose-200'],
-    'PREPARANDO': ['bg-amber-50','text-amber-800','border-amber-200'],
-    'ENVIADO': ['bg-sky-50','text-sky-700','border-sky-200'],
-    'ENTREGADO': ['bg-green-50','text-green-700','border-green-200'],
-    'CANCELADO': ['bg-rose-50','text-rose-700','border-rose-200'],
+    NUEVO:                ['border','bg-amber-50','text-amber-800','border-amber-200'],
+    APROBADO_QF:          ['border','bg-sky-50','text-sky-700','border-sky-200'],
+    APROBADO_CRITERIO_QF: ['border','bg-sky-50','text-sky-700','border-sky-200'],
+    RECHAZADO_QF:         ['border','bg-rose-50','text-rose-700','border-rose-200'],
+    EN_PREPARACION:       ['border','bg-indigo-50','text-indigo-700','border-indigo-200'],
+    EN_TRANSITO:          ['border','bg-indigo-50','text-indigo-700','border-indigo-200'],
+    ENTREGADO:            ['border','bg-green-50','text-green-700','border-green-200'],
+    RECHAZADO_CLIENTE:    ['border','bg-rose-50','text-rose-700','border-rose-200'],
+    PENDIENTE_PAGO:       ['border','bg-amber-50','text-amber-800','border-amber-200'],
   };
 
-  function titleFromCode(code){
-    return (code || 'NUEVO').toString().replace(/_/g,' ').toLowerCase()
-      .replace(/(^|\s)\S/g, s => s.toUpperCase());
+  function titleFromCode(code) {
+    return (code || 'NUEVO').toString()
+      .replace(/_/g,' ')
+      .toLowerCase()
+      .replace(/(^|\s)\S/g, function (s) { return s.toUpperCase(); });
   }
-  function applyEstadoBadge(code){
-    const el = document.getElementById('badge-estado');
+
+  function applyEstadoBadge(code) {
+    var el = document.getElementById('badge-estado');
     if (!el) return;
-    // limpiar clases anteriores (todas las bg/text/border conocidas)
-    Object.values(estadoMap).flat().forEach(c => el.classList.remove(c));
-    const cls = estadoMap[(code||'NUEVO').toUpperCase()] || estadoMap['NUEVO'];
-    el.classList.add(...cls);
-    el.dataset.estado = code;
-    el.textContent = titleFromCode(code);
+    var all = [];
+    for (var k in estadoMap) { if (Object.prototype.hasOwnProperty.call(estadoMap, k)) { all = all.concat(estadoMap[k]); } }
+    all.forEach(function (c) { el.classList.remove(c); });
+
+    var cls = estadoMap[(code || 'NUEVO').toUpperCase()] || estadoMap['NUEVO'];
+    el.classList.add.apply(el.classList, cls);
+    el.setAttribute('data-estado', code);
+    el.textContent = displayByCode[code] || titleFromCode(code);
   }
-  // pintar estado inicial
-  applyEstadoBadge(document.getElementById('badge-estado')?.dataset.estado || 'NUEVO');
+
+  var badge = document.getElementById('badge-estado');
+  applyEstadoBadge((badge && badge.dataset ? badge.dataset.estado : 'NUEVO') || 'NUEVO');
 
   // Abrir modal de estado
-  document.getElementById('act-estado')?.addEventListener('click', () => {
-    toggleMenu(false);
-    openModal('estado');
-  });
+  var actEstado = document.getElementById('act-estado');
+  if (actEstado) {
+    actEstado.addEventListener('click', function () {
+      toggleMenu(false);
+      openModal('estado');
+    });
+  }
 
   // Guardar estado
-  document.getElementById('form-estado')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    console.log('[pedido-actions] submit cambio estado ->', Object.fromEntries(fd.entries()));
-
-    const btn = document.getElementById('btn-save-estado');
-    if (btn) {
-      btn.setAttribute('disabled', 'true');
-      btn.classList.add('opacity-70','cursor-not-allowed');
-      btn.textContent = 'Guardando…';
-    }
-
-    try {
-      const resp = await fetch(`/admin/pedidos/${pedidoId}/cambiar-estado`, { method: 'POST', body: fd });
-      const json = await resp.json().catch(() => ({}));
-      console.log('[pedido-actions] cambiar-estado resp:', json);
-      if (json.ok) {
-        applyEstadoBadge(json.nuevo_estado);
-        closeModal('estado');
-        // TODO: refrescar contador de notas sin recarga si se desea
-      } else {
-        alert('No se pudo cambiar el estado: ' + (json.error || 'error desconocido'));
-      }
-    } catch (err) {
-      console.error('[pedido-actions] fetch error', err);
-      alert('Error de red al cambiar estado.');
-    } finally {
+  var formEstado = document.getElementById('form-estado');
+  if (formEstado) {
+    formEstado.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var fd = new FormData(formEstado);
+      var btn = document.getElementById('btn-save-estado');
       if (btn) {
-        btn.removeAttribute('disabled');
-        btn.classList.remove('opacity-70','cursor-not-allowed');
-        btn.textContent = 'Guardar estado';
+        btn.setAttribute('disabled', 'true');
+        btn.classList.add('opacity-70','cursor-not-allowed');
+        btn.textContent = 'Guardando…';
       }
-    }
-  });
+      try {
+        const resp = await fetch("/admin/pedidos/" + pedidoId + "/cambiar-estado", { method: 'POST', body: fd });
+        const json = await resp.json().catch(function () { return {}; });
+        if (json && json.ok) {
+          applyEstadoBadge(json.nuevo_estado);
+          closeModal('estado');
+        } else {
+          alert('No se pudo cambiar el estado: ' + ((json && json.error) || 'error desconocido'));
+        }
+      } catch (err) {
+        console.error('[pedido-actions] fetch error', err);
+        alert('Error de red al cambiar estado.');
+      } finally {
+        if (btn) {
+          btn.removeAttribute('disabled');
+          btn.classList.remove('opacity-70','cursor-not-allowed');
+          btn.textContent = 'Guardar estado';
+        }
+      }
+    });
+  }
 
   // ===== Pagos (UI) =====
-  // Abrir modales de pago
-  document.getElementById('btn-pay-email')?.addEventListener('click', () => {
-    console.log('[pagos-ui] abrir modal pay-email');
-    openModal('payEmail');
-  });
-  document.getElementById('btn-pay-manual')?.addEventListener('click', () => {
-    console.log('[pagos-ui] abrir modal pay-manual');
-    openModal('payManual');
-  });
+  var btnPayEmail = document.getElementById('btn-pay-email');
+  if (btnPayEmail) btnPayEmail.addEventListener('click', function () { openModal('payEmail'); });
 
-  // Enviar solicitud de pago por correo
-  document.getElementById('form-pay-email')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    console.log('[pagos-ui] enviar solicitud ->', Object.fromEntries(fd.entries()));
-    const btn = document.getElementById('btn-send-pay-email');
-    btn?.setAttribute('disabled','true');
-    btn && (btn.textContent = 'Enviando…');
+  var btnPayManual = document.getElementById('btn-pay-manual');
+  if (btnPayManual) btnPayManual.addEventListener('click', function () { openModal('payManual'); });
 
-    try {
-      const resp = await fetch(`/admin/pagos/${pedidoId}/enviar-solicitud`, { method: 'POST', body: fd });
-      const json = await resp.json().catch(() => ({}));
-      console.log('[pagos-ui] resp solicitud:', json);
-      if (json.ok) {
-        closeModal('payEmail');
-        alert('Solicitud de pago registrada.');
-      } else {
-        alert('No se pudo enviar: ' + (json.error || 'Error'));
+  var formPayEmail = document.getElementById('form-pay-email');
+  if (formPayEmail) {
+    formPayEmail.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var fd = new FormData(formPayEmail);
+      var btn = document.getElementById('btn-send-pay-email');
+      if (btn) { btn.setAttribute('disabled','true'); btn.textContent = 'Enviando…'; }
+      try {
+        const resp = await fetch("/admin/pagos/" + pedidoId + "/enviar-solicitud", { method: 'POST', body: fd });
+        const json = await resp.json().catch(function () { return {}; });
+        if (json && json.ok) {
+          closeModal('payEmail');
+          alert('Solicitud de pago registrada.');
+        } else {
+          alert('No se pudo enviar: ' + ((json && json.error) || 'Error'));
+        }
+      } catch (err) {
+        console.error('[pagos-ui] error', err);
+        alert('Error de red.');
+      } finally {
+        if (btn) { btn.removeAttribute('disabled'); btn.textContent = 'Enviar'; }
       }
-    } catch (err) {
-      console.error('[pagos-ui] error', err);
-      alert('Error de red.');
-    } finally {
-      if (btn) { btn.removeAttribute('disabled'); btn.textContent = 'Enviar'; }
-    }
-  });
+    });
+  }
 
-  // Marcar manualmente como pagado
-  document.getElementById('form-pay-manual')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    console.log('[pagos-ui] marcar pagado ->', Object.fromEntries(fd.entries()));
-    const btn = document.getElementById('btn-save-pay-manual');
-    btn?.setAttribute('disabled','true');
-    btn && (btn.textContent = 'Guardando…');
-
-    try {
-      const resp = await fetch(`/admin/pagos/${pedidoId}/marcar-pagado`, { method: 'POST', body: fd });
-      const json = await resp.json().catch(() => ({}));
-      console.log('[pagos-ui] resp marcar-pagado:', json);
-      if (json.ok) {
-        closeModal('payManual');
-        location.reload();
-      } else {
-        alert('No se pudo guardar: ' + (json.error || 'Error'));
+  var formPayManual = document.getElementById('form-pay-manual');
+  if (formPayManual) {
+    formPayManual.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var fd = new FormData(formPayManual);
+      var btn = document.getElementById('btn-save-pay-manual');
+      if (btn) { btn.setAttribute('disabled','true'); btn.textContent = 'Guardando…'; }
+      try {
+        const resp = await fetch("/admin/pagos/" + pedidoId + "/marcar-pagado", { method: 'POST', body: fd });
+        const json = await resp.json().catch(function () { return {}; });
+        if (json && json.ok) {
+          closeModal('payManual');
+          location.reload();
+        } else {
+          alert('No se pudo guardar: ' + ((json && json.error) || 'Error'));
+        }
+      } catch (err) {
+        console.error('[pagos-ui] error', err);
+        alert('Error de red.');
+      } finally {
+        if (btn) { btn.removeAttribute('disabled'); btn.textContent = 'Guardar pago'; }
       }
-    } catch (err) {
-      console.error('[pagos-ui] error', err);
-      alert('Error de red.');
-    } finally {
-      if (btn) { btn.removeAttribute('disabled'); btn.textContent = 'Guardar pago'; }
-    }
-  });
+    });
+  }
 })();
 </script>
+
 
 {% endblock %}
