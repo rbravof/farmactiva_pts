@@ -56,17 +56,6 @@ def _normalize_username(u: str) -> str:
     return u.lower()
 
 # ===================== Listado =====================
-from typing import Optional
-from fastapi import APIRouter, Depends, Request, Query
-from sqlalchemy.orm import Session
-from sqlalchemy import text
-from app.db import get_db
-from app.routers.admin_security import require_admin
-
-ALLOWED_ROLES = {"admin", "qf", "aux", "transportista"}
-
-router = APIRouter(prefix="/admin/usuarios", tags=["Usuarios & Roles"])
-
 @router.get("", response_class=HTMLResponse)
 def usuarios_list(
     request: Request,
